@@ -1,0 +1,21 @@
+# Environment
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Solidity build output (compiled artifacts are committed selectively, see artifacts/)
+artifacts/build/
+
+# Pipeline output — real runs are large; only the curated demo run is committed
+evidence/run_*/
+
+# OS
+Thumbs.db
+.DS_Store
