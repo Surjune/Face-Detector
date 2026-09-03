@@ -13,6 +13,27 @@ input image
   → verify: recompute the hash, look it up on chain
 ```
 
+## See it working
+
+`evidence/run_2026-09-03T16-10-03Z/` is a real run committed to this repository:
+Google Lens returned 30 candidates for the probe photograph, 25 cleared the
+similarity threshold across Wikipedia, Reuters, Forbes, IMDb and others, and the
+best match was anchored on Sepolia at digest
+[`0xb9bbc6b1…9d62`](https://sepolia.etherscan.io/tx/0xd6d07f2024b7d8d7b809608101015b7db380b0d6d943b75cc342f39a3aa4699c).
+Open `report.html` inside it for the full candidate table, or reproduce the
+check yourself with nothing but a clean clone:
+
+```bash
+python -m src.pipeline verify --run "evidence/run_2026-09-03T16-10-03Z"
+```
+
+```bash
+python -m src.pipeline tamper-demo --run "evidence/run_2026-09-03T16-10-03Z"
+```
+
+Neither command needs a key, a wallet, or any setup beyond installing the
+dependencies above — `verify` reads the public Sepolia RPC directly.
+
 ## Why the middle step matters
 
 A reverse image search on its own only finds copies of the *same file*. It is an
@@ -54,7 +75,8 @@ run on a clean clone with no signup of any kind, and Etherscan for a link anyone
 can click.
 
 - Contract: `contracts/PostRegistry.sol`, Solidity 0.8.24
-- Deployed address: *pending — filled in when the demo run is published*
+- Deployed address: [`0x56394614d21b38C0557810e1Bb1D934b4620B9C4`](https://sepolia.etherscan.io/address/0x56394614d21b38C0557810e1Bb1D934b4620B9C4)
+- Deployment transaction: [`0x6ac98a8d…c29b`](https://sepolia.etherscan.io/tx/0x6ac98a8dbfd7a64148e60de0b2f8adfaeb05b09ae3b29d4ec68197f90c47c29b)
 
 ## Install
 
