@@ -10,5 +10,11 @@
 # through pycryptodome, which web3 already installs. Every other dependency
 # of these two packages is listed in requirements.txt, so skipping dependency
 # resolution here drops only the unusable one.
-eth-tester>=0.12.0
-py-evm>=0.12.0b2
+#
+# Pinned exactly, not with a lower bound. Neither package has ever published a
+# stable release — every version on PyPI is a beta — and pip only resolves to
+# a pre-release when the specifier itself names one. A bound like ">=0.12.0"
+# names no pre-release, so pip reports no matching distribution at all, even
+# though every available version would technically satisfy it.
+eth-tester==0.14.0b1
+py-evm==0.12.1b1
