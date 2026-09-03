@@ -1,0 +1,19 @@
+{
+  "embedding_sha256": "fcdbd6c0169bfc5312282d23f9da28e3349c9186fe5691cab935a459feabb3b4",
+  "input_image_sha256": "8e2e4fc7f6a119a16b45d7cb177975f95cf3c2d7e52be642ccc14f783f65bb4f",
+  "match": {
+    "image_sha256": "8e2e4fc7f6a119a16b45d7cb177975f95cf3c2d7e52be642ccc14f783f65bb4f",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Sundar_Pichai_-_2023_(cropped).jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+    "page_title": "Sundar Pichai - Wikipedia",
+    "post_url": "https://en.wikipedia.org/wiki/Sundar_Pichai",
+    "similarity": "1.0000"
+  },
+  "pipeline_version": "1.0.0",
+  "schema": "face-chain-verify/v1",
+  "search": {
+    "candidate_count": 30,
+    "provider": "serpapi_google_lens",
+    "query_image_sha256": "8e2e4fc7f6a119a16b45d7cb177975f95cf3c2d7e52be642ccc14f783f65bb4f",
+    "retrieved_at": "2026-09-03T16:10:20Z"
+  }
+}
