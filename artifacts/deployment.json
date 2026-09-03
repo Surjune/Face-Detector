@@ -1,0 +1,9 @@
+{
+  "contract": "PostRegistry",
+  "address": "0x56394614d21b38C0557810e1Bb1D934b4620B9C4",
+  "chain_id": 11155111,
+  "network": "sepolia",
+  "tx_hash": "6ac98a8dbfd7a64148e60de0b2f8adfaeb05b09ae3b29d4ec68197f90c47c29b",
+  "block_number": 11627631,
+  "deployed_at": "2026-09-03T16:07:48Z"
+}
