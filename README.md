@@ -25,8 +25,9 @@ Under active development. See the commit history for what has landed.
 | Stage | State |
 | --- | --- |
 | Face detection and embedding | done |
-| Blockchain anchoring and verification | in progress |
-| Web / social search | in progress |
+| Web search and candidate re-recognition | done |
+| Blockchain anchoring and verification | done |
+| Deployed contract and a published demo run | pending |
 
 ## Requirements
 
@@ -38,12 +39,21 @@ python -m venv .venv
 ```
 
 ```bash
-.venv/Scripts/pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+.venv/Scripts/pip install torch==2.2.2 torchvision==0.17.2 --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ```bash
 .venv/Scripts/pip install -r requirements.txt
 ```
+
+```bash
+.venv/Scripts/pip install --no-deps -r requirements-evm.txt
+```
+
+The third step installs the in-process EVM. It uses `--no-deps` because py-evm
+declares a keccak backend whose C extension has no Windows wheel; nothing
+imports it, and every dependency that is actually needed is in
+`requirements.txt`. See the comments in `requirements-evm.txt`.
 
 Pretrained weights (~110 MB, MTCNN and InceptionResnetV1) download automatically
 into the PyTorch cache the first time a face is processed.
