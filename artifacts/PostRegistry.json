@@ -1,0 +1,111 @@
+{
+  "contract": "PostRegistry",
+  "solc_version": "0.8.24",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "digest",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "AlreadyAnchored",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "EmptyDigest",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "digest",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "submitter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "name": "Anchored",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "digest",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "name": "anchor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "digest",
+          "type": "bytes32"
+        }
+      ],
+      "name": "verify",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        },
+        {
+          "internalType": "address",
+          "name": "submitter",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "blockNumber",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561000f575f80fd5b5061032d8061001d5f395ff3fe608060405234801561000f575f80fd5b5060043610610034575f3560e01c80631a8512ea1461003857806375e366161461004d575b5f80fd5b61004b61004636600461022c565b6100ea565b005b6100af61005b3660046102a1565b5f9081526020818152604091829020825160608101845281546001600160a01b03811680835267ffffffffffffffff600160a01b909204821694830185905260019093015416930183905281151593909290565b6040805194151585526001600160a01b0393909316602085015267ffffffffffffffff91821684840152166060830152519081900360800190f35b82610108576040516373ca609760e01b815260040160405180910390fd5b5f8381526020819052604090208054600160a01b900467ffffffffffffffff1615610166578054604051637332e7a760e01b815260048101869052600160a01b90910467ffffffffffffffff16602482015260440160405180910390fd5b604080516060810182523380825267ffffffffffffffff4281811660208086019182524384168688019081525f8c815291829052908790209551865492518516600160a01b026001600160e01b03199093166001600160a01b03919091161791909117855551600190940180549490921667ffffffffffffffff19909416939093179055915186917fc10c67aa645e970b6e9f69631a907c49b5f2ea120ad1d009358cf779d6a916799161021e9190889088906102b8565b60405180910390a350505050565b5f805f6040848603121561023e575f80fd5b83359250602084013567ffffffffffffffff8082111561025c575f80fd5b818601915086601f83011261026f575f80fd5b81358181111561027d575f80fd5b87602082850101111561028e575f80fd5b6020830194508093505050509250925092565b5f602082840312156102b1575f80fd5b5035919050565b67ffffffffffffffff8416815260406020820152816040820152818360608301375f818301606090810191909152601f909201601f191601019291505056fea2646970667358221220ecfba1cd0285e9b1362d04f6412f2238447d1a1b20fa6db08b16c02859db915e64736f6c63430008180033"
+}
