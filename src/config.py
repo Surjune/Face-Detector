@@ -54,11 +54,24 @@ EMBEDDING_DIM = 512
 EMBEDDING_DECIMALS = 6
 
 # Cosine similarity at or above which two faces are treated as the same person.
-# For L2-normalised embeddings, cosine = 1 - (L2_distance ** 2) / 2, so the widely
-# used vggface2 L2 threshold of ~1.0 corresponds to cosine ~0.50. We sit slightly
-# above that: in a web search a false positive anchored on-chain is far worse than
-# a missed match. Re-derive with scripts/calibrate_threshold.py.
-FACE_MATCH_THRESHOLD = 0.55
+#
+# Measured, not assumed. Over a labelled set of freely licensed Commons
+# photographs of three people (scripts/fetch_calibration_set.py, then
+# scripts/calibrate_threshold.py):
+#
+#     genuine pairs    n=5   min +0.6405  mean +0.7843  max +0.9370
+#     impostor pairs   n=16  min -0.1949  mean +0.0286  max +0.3040
+#
+# The two distributions do not overlap; the empty band runs from 0.3040 to
+# 0.6405, whose midpoint is 0.4722. This value sits just above that midpoint
+# because the asymmetry matters: a false match gets anchored on a public
+# blockchain and cannot be withdrawn, while a missed match merely ends the run.
+# That leaves 0.20 of margin above the worst impostor and 0.14 below the worst
+# genuine pair.
+#
+# The sample is small, so treat this as calibrated rather than settled, and
+# re-derive it on a larger set before relying on the exact value.
+FACE_MATCH_THRESHOLD = 0.50
 
 # Similarity values are rounded to this many decimals before hashing. Raw float
 # repr differs across platforms and would break cross-machine verification.

@@ -19,3 +19,4 @@ evidence/run_*/
 # OS
 Thumbs.db
 .DS_Store
+dataset/
