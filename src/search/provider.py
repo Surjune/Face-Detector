@@ -34,6 +34,7 @@ class Source(str, Enum):
     LENS_VIDEO = "lens_short_video"
     SITE_SEARCH = "site_search"
     YOUTUBE_API = "youtube_data_api"
+    YANDEX_IMAGE = "yandex_image_result"
 
 
 @dataclass(frozen=True)

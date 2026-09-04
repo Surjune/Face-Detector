@@ -86,10 +86,15 @@ SIMILARITY_DECIMALS = 4
 # Search stage
 # --------------------------------------------------------------------------
 
-# Upper bound on candidates pulled from a provider response. Google Lens returns
-# far more visual matches than are useful, and each one costs a download plus a
-# forward pass.
+# Upper bound on candidates pulled from a single provider response. A visual
+# search returns far more matches than are useful, and each one costs a download
+# plus a forward pass.
 MAX_CANDIDATES = 30
+
+# Ceiling across every engine combined. Two visual engines plus platform
+# expansion can otherwise produce well over a hundred leads, and at roughly
+# three seconds each that turns a two-minute run into ten.
+MAX_TOTAL_CANDIDATES = 60
 
 # Per-request network budget for fetching a candidate image.
 DOWNLOAD_TIMEOUT_SECONDS = 15.0
@@ -102,6 +107,12 @@ ALLOWED_IMAGE_CONTENT_TYPES = ("image/jpeg", "image/png", "image/webp", "image/b
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search"
 SERPAPI_LENS_ENGINE = "google_lens"
+
+# Yandex matches ordinary faces far better than Google, which restricts public
+# face matching for private individuals. Published comparisons put Yandex around
+# 65-75% at finding another photograph of the same person against Google's
+# 30-40%, so both engines are queried and merged.
+SERPAPI_YANDEX_ENGINE = "yandex_images"
 
 # Anonymous, keyless image host used when the probe image is not committed to the
 # repository. Google Lens accepts an image URL, not an upload.

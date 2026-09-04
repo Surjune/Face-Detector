@@ -35,6 +35,7 @@ from src.config import (
     DEFAULT_PROBE_IMAGE,
     EMBEDDING_DIM,
     FACE_MATCH_THRESHOLD,
+    MAX_TOTAL_CANDIDATES,
     SEPOLIA_CHAIN_ID,
     SEPOLIA_TX_EXPLORER,
     Settings,
@@ -63,6 +64,7 @@ from src.search import (
     SearchProvider,
     SerpApiLensProvider,
     TARGET_PLATFORMS,
+    YandexReverseImageProvider,
     derive_identity,
     download_image,
     missing_platforms,
@@ -147,6 +149,8 @@ def run(
     ui.ok(f"{len(response.candidates)} lead(s) from the visual search")
 
     candidates = list(response.candidates)
+    candidates += _yandex_pass(settings, query_url, candidates, replay is not None)
+
     identity = derive_identity(response.identity, candidates)
     if identity is not None:
         ui.ok(f"Subject identified as \"{identity.name}\" (via {identity.origin})")
@@ -154,6 +158,9 @@ def run(
         ui.ok("Subject not identified; skipping targeted platform search")
 
     candidates += _expand_platforms(settings, identity, candidates, replay is not None)
+    if len(candidates) > MAX_TOTAL_CANDIDATES:
+        ui.ok(f"capping {len(candidates)} leads at {MAX_TOTAL_CANDIDATES}")
+        candidates = candidates[:MAX_TOTAL_CANDIDATES]
     ui.ok(f"{len(candidates)} lead(s) total; re-running face recognition on each")
 
     scored = score_candidates(
@@ -444,6 +451,41 @@ def _chain_label(client: RegistryClient) -> str:
     if client.is_local:
         return "in-process test chain"
     return describe_chain(client.chain_id)
+
+
+def _yandex_pass(
+    settings: Settings,
+    query_url: str,
+    harvested: list[Candidate],
+    is_replay: bool,
+) -> list[Candidate]:
+    """Search Yandex as well, and keep whatever Lens did not already find.
+
+    This is the step that decides whether an ordinary person can be found at
+    all. Google restricts public face matching for private individuals; Yandex
+    does not, and matches faces across pose and lighting that Lens misses. For a
+    well-known subject it adds little, for everyone else it is the difference
+    between a result and an empty run.
+
+    A failure here is reported and swallowed: it is a second opinion on top of a
+    harvest that already stands on its own.
+    """
+    if is_replay or not settings.serpapi_key:
+        return []
+
+    try:
+        response = YandexReverseImageProvider(settings.serpapi_key).search(query_url)
+    except SearchError as exc:
+        ui.ok(f"Yandex search unavailable: {exc.message}")
+        return []
+
+    seen = {item.page_url for item in harvested}
+    fresh = [item for item in response.candidates if item.page_url not in seen]
+    ui.ok(
+        f"Yandex reverse image: {len(response.candidates)} result(s), "
+        f"{len(fresh)} not already seen"
+    )
+    return fresh
 
 
 def _expand_platforms(
