@@ -32,6 +32,7 @@ from src.chain import (
     sha256_hex,
 )
 from src.config import (
+    DEFAULT_PROBE_IMAGE,
     EMBEDDING_DIM,
     FACE_MATCH_THRESHOLD,
     SEPOLIA_CHAIN_ID,
@@ -81,7 +82,10 @@ app = typer.Typer(
 
 @app.command()
 def run(
-    image: Annotated[Path, typer.Option("--image", help="Photograph of the face to search for.")],
+    image: Annotated[
+        Path | None,
+        typer.Option("--image", help="Photograph to search for. Defaults to inputs/probe.jpg."),
+    ] = None,
     chain: Annotated[
         str, typer.Option("--chain", help="Where to anchor: 'sepolia' or 'local'.")
     ] = "sepolia",
@@ -112,8 +116,12 @@ def run(
 
     # -- 1. face ---------------------------------------------------------
     ui.section("[1/3] FACE DETECTION & ENCODING")
+    image = image or DEFAULT_PROBE_IMAGE
     if not image.exists():
-        raise PipelineError(f"No such image: {image}")
+        raise PipelineError(
+            f"No image at {image}. Put a photograph there, or pass --image.",
+        )
+    ui.ok(f"Input: {image}")
     encoding = encode_primary_face(image)
     input_digest = sha256_hex(image.read_bytes())
     evidence.copy_input_image(run_dir, image)

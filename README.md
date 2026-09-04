@@ -17,6 +17,24 @@ input image
 Seven platforms are covered deliberately: **Facebook, X, Threads, LinkedIn,
 YouTube, Instagram and TikTok** (Reddit counts too when it turns up).
 
+## Searching for someone
+
+Replace one file and run one command:
+
+```bash
+python -m src.pipeline run
+```
+
+`inputs/probe.jpg` is the only input. Drop any photograph there and everything
+else follows from it — nothing is configured per subject, and the pipeline does
+not know who it is looking for until the search tells it. Pass
+`--image path/to/photo.jpg` to use a file somewhere else.
+
+Verified on a second subject with no other change: the run identified them from
+the search results, queried the platforms the visual index had missed, and
+anchored a LinkedIn post face-verified at 0.9600 — 10 social matches across
+LinkedIn, YouTube, Instagram and Threads.
+
 ## See it working
 
 `evidence/run_2026-09-04T09-23-05Z/` is a real run committed to this repository.
@@ -198,14 +216,15 @@ network and nothing else.
 ## Commands
 
 ```bash
-python -m src.pipeline run --image inputs/probe.jpg
+python -m src.pipeline run
 ```
 
-Full pipeline: find the face, search, score every candidate, anchor the match on
-Sepolia, write an evidence folder and an HTML report.
+Full pipeline on `inputs/probe.jpg`: find the face, search, score every
+candidate, anchor the social post on Sepolia, write an evidence folder and an
+HTML report. Add `--image path/to/photo.jpg` for a file elsewhere.
 
 ```bash
-python -m src.pipeline run --image inputs/probe.jpg --chain local
+python -m src.pipeline run --chain local
 ```
 
 The same, on an EVM running inside the Python process. No faucet, no gas, no
@@ -280,7 +299,7 @@ Google CEO Sundar Pichai" frequently shows a different person at the same event.
 .venv/Scripts/python -m pytest
 ```
 
-182 tests. No test makes a network call. Two kinds are worth singling out:
+191 tests. No test makes a network call. Two kinds are worth singling out:
 
 - The **contract tests are not mocked**. The Solidity is genuinely compiled and
   executed on an in-process EVM, covering anchoring, lookup, rejection of a

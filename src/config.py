@@ -16,6 +16,11 @@ load_dotenv()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EVIDENCE_ROOT = REPO_ROOT / "evidence"
+
+# Drop any photograph here and `run` needs no arguments at all. Resolved from
+# the repository root rather than the working directory, so the command behaves
+# the same wherever it is invoked from.
+DEFAULT_PROBE_IMAGE = REPO_ROOT / "inputs" / "probe.jpg"
 ARTIFACTS_ROOT = REPO_ROOT / "artifacts"
 CONTRACTS_ROOT = REPO_ROOT / "contracts"
 
