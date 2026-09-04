@@ -76,6 +76,17 @@ class NoMatchFound(SearchError):
     code = "no_match_found"
 
 
+class NoSocialMatchFound(SearchError):
+    """Faces were matched, but none of them on a social media platform.
+
+    Distinct from NoMatchFound: the search worked and identified the person,
+    just not on a social platform. Anchoring a non-social page instead would
+    quietly fail the requirement, so this is raised rather than substituted.
+    """
+
+    code = "no_social_match_found"
+
+
 # --- Chain stage ---------------------------------------------------------
 
 

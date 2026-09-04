@@ -25,7 +25,7 @@ from src.face import FaceEncoding
 from src.search.provider import SearchResponse
 from src.search.replay import record_response
 from src.search.serpapi_lens import parse_visual_matches
-from tests.test_search import lens_payload
+from tests.test_search import lens_payload, non_social_payload
 
 runner = CliRunner()
 
@@ -71,15 +71,16 @@ def stubs(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda path: FaceEncoding(box=(10.0, 20.0, 90.0, 120.0), confidence=0.997, embedding=embedding),
     )
 
-    def fake_download(url: str) -> bytes:
+    def fake_download(urls: Any, *, referer: str | None = None) -> tuple[bytes, str]:
+        url = urls[0]
         index = int(url.rsplit("/", 1)[-1].split(".")[0])
-        return f"image-{index}".encode()
+        return f"image-{index}".encode(), url
 
     def fake_best_match(reference: np.ndarray, image_bytes: bytes) -> Any:
         index = int(image_bytes.decode().rsplit("-", 1)[-1])
         return CANDIDATE_SCORES[index], object()
 
-    monkeypatch.setattr(filter_module, "download_image", fake_download)
+    monkeypatch.setattr(filter_module, "download_first_available", fake_download)
     monkeypatch.setattr(filter_module, "encode_best_match", fake_best_match)
 
 
@@ -99,6 +100,38 @@ def do_run(probe_image: Path, recorded_search: Path, out: Path) -> Any:
 
 def latest_run_dir(out: Path) -> Path:
     return sorted(out.glob("run_*"))[-1]
+
+
+def _recorded(directory: Path, payload: dict[str, Any]) -> Path:
+    """Write a recorded search response for the pipeline to replay."""
+    directory.mkdir(parents=True, exist_ok=True)
+    record_response(
+        directory,
+        SearchResponse(
+            provider="serpapi_google_lens",
+            query_image_url="https://example.com/probe.jpg",
+            retrieved_at="2026-09-03T15:40:00Z",
+            candidates=parse_visual_matches(payload),
+            raw=payload,
+        ),
+    )
+    return directory
+
+
+def _run(
+    probe_image: Path, source: Path, out: Path, extra: list[str] | None = None
+) -> Any:
+    return runner.invoke(
+        pipeline.app,
+        [
+            "run",
+            "--image", str(probe_image),
+            "--chain", "local",
+            "--replay", str(source),
+            "--out", str(out),
+            *(extra or []),
+        ],
+    )
 
 
 @pytest.mark.usefixtures("stubs")
@@ -213,6 +246,98 @@ class TestRun:
 
 
 @pytest.mark.usefixtures("stubs")
+class TestSocialSelection:
+    """The brief asks for a social media post, so one is what gets anchored."""
+
+    def test_anchors_a_social_post_over_a_higher_scoring_page(
+        self, probe_image: Path, tmp_path: Path
+    ) -> None:
+        """The defect this whole change exists to fix.
+
+        An exact-file copy on an encyclopaedia scores 1.0000 and would win on
+        raw similarity, burying a genuine social post that scores lower.
+        """
+        from src import evidence
+
+        payload = {
+            "visual_matches": [
+                {
+                    "title": "Subject - Wikipedia",
+                    "link": "https://en.wikipedia.org/wiki/Subject",
+                    "image": "https://cdn.example.com/0.jpg",
+                },
+                {
+                    # Scores lower than the Wikipedia copy but still clears the
+                    # threshold: exactly the case that used to be buried.
+                    "title": "A post",
+                    "link": "https://www.instagram.com/p/POST1/",
+                    "image": "https://cdn.example.com/2.jpg",
+                },
+            ]
+        }
+        source = _recorded(tmp_path / "recorded", payload)
+        result = _run(probe_image, source, tmp_path / "out")
+
+        assert result.exit_code == 0, result.output
+        receipt = evidence.read_receipt(latest_run_dir(tmp_path / "out"))
+        assert "instagram.com" in receipt.match.post_url
+        assert "Social media post found" in result.output
+
+    def test_refuses_to_anchor_when_nothing_social_matched(
+        self, probe_image: Path, tmp_path: Path
+    ) -> None:
+        """Silently anchoring a non-social page is the bug, not the fallback."""
+        source = _recorded(tmp_path / "recorded", non_social_payload(2))
+        result = _run(probe_image, source, tmp_path / "out")
+
+        assert result.exit_code != 0
+        assert isinstance(result.exception, SystemExit) or result.exception is not None
+
+    def test_allow_non_social_overrides_deliberately(
+        self, probe_image: Path, tmp_path: Path
+    ) -> None:
+        from src import evidence
+
+        source = _recorded(tmp_path / "recorded", non_social_payload(2))
+        result = _run(
+            probe_image, source, tmp_path / "out", extra=["--allow-non-social"]
+        )
+
+        assert result.exit_code == 0, result.output
+        receipt = evidence.read_receipt(latest_run_dir(tmp_path / "out"))
+        assert "wikipedia.org" in receipt.match.post_url
+
+    def test_reports_coverage_for_every_target_platform(
+        self, probe_image: Path, recorded_search: Path, tmp_path: Path
+    ) -> None:
+        """Searched-and-found-nothing is a more honest report than silence."""
+        result = do_run(probe_image, recorded_search, tmp_path / "out")
+        for label in ("Facebook", "X / Twitter", "Threads", "LinkedIn", "TikTok"):
+            assert label in result.output
+
+
+class TestPublishedRunStillVerifies:
+    """Guards the decision to freeze the receipt schema.
+
+    A run is already anchored on Sepolia. Any change to how a receipt
+    canonicalises would change its digest and silently invalidate that record.
+    """
+
+    def test_the_committed_receipt_still_hashes_to_its_anchored_digest(self) -> None:
+        from src import evidence
+        from src.chain.canonical import receipt_digest
+        from src.config import REPO_ROOT
+
+        run_dir = REPO_ROOT / "evidence" / "run_2026-09-03T16-10-03Z"
+        if not run_dir.exists():
+            pytest.skip("the published demo run is not present")
+
+        assert receipt_digest(evidence.read_receipt(run_dir)) == (
+            evidence.read_anchor(run_dir).digest
+        )
+
+
+@pytest.mark.usefixtures("stubs")
 class TestVerifyAndTamper:
     def test_verify_reports_a_local_run_as_unverifiable(
         self, probe_image: Path, recorded_search: Path, tmp_path: Path
@@ -276,13 +401,18 @@ class TestUnreachableCandidates:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        def flaky_download(url: str) -> bytes:
+        def flaky_download(
+            urls: Any, *, referer: str | None = None
+        ) -> tuple[bytes, str]:
+            url = urls[0]
             index = int(url.rsplit("/", 1)[-1].split(".")[0])
             if index == 0:
                 raise DownloadError("HTTP 404", url=url)
-            return f"image-{index}".encode()
+            return f"image-{index}".encode(), url
 
-        monkeypatch.setattr(filter_module, "download_image", flaky_download)
+        monkeypatch.setattr(
+            filter_module, "download_first_available", flaky_download
+        )
 
         result = do_run(probe_image, recorded_search, tmp_path / "out")
         assert result.exit_code == 0, result.output

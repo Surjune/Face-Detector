@@ -25,16 +25,33 @@ from src.search.serpapi_lens import SerpApiLensProvider, parse_visual_matches
 
 
 def lens_payload(count: int = 3, **extra: Any) -> dict[str, Any]:
+    """A Lens response whose results are social posts, as real ones are."""
     return {
         "visual_matches": [
             {
                 "position": index + 1,
                 "title": f"Result {index}",
-                "link": f"https://example.com/post/{index}",
-                "source": "example.com",
+                "link": f"https://www.instagram.com/p/POST{index}/",
+                "source": "Instagram",
                 "thumbnail": f"https://cdn.example.com/thumb/{index}.jpg",
                 "image": f"https://cdn.example.com/full/{index}.jpg",
                 **extra,
+            }
+            for index in range(count)
+        ]
+    }
+
+
+def non_social_payload(count: int = 2) -> dict[str, Any]:
+    """A Lens response containing nothing on a social platform."""
+    return {
+        "visual_matches": [
+            {
+                "position": index + 1,
+                "title": f"Encyclopaedia entry {index}",
+                "link": f"https://en.wikipedia.org/wiki/Subject_{index}",
+                "source": "Wikipedia",
+                "image": f"https://cdn.example.com/full/{index}.jpg",
             }
             for index in range(count)
         ]
@@ -310,7 +327,7 @@ def _candidates(count: int) -> list[Candidate]:
             position=index + 1,
             title=f"Result {index}",
             page_url=f"https://example.com/post/{index}",
-            image_url=f"https://cdn.example.com/{index}.jpg",
+            image_urls=(f"https://cdn.example.com/{index}.jpg",),
             source="example.com",
         )
         for index in range(count)
@@ -328,11 +345,12 @@ def _stub_scoring(
     unreachable = unreachable or set()
     faceless = faceless or set()
 
-    def fake_download(url: str) -> bytes:
+    def fake_download(urls: Any, *, referer: str | None = None) -> tuple[bytes, str]:
+        url = urls[0]
         index = int(url.rsplit("/", 1)[-1].split(".")[0])
         if index in unreachable:
             raise DownloadError("HTTP 403", url=url)
-        return f"image-{index}".encode()
+        return f"image-{index}".encode(), url
 
     def fake_best_match(reference: np.ndarray, image_bytes: bytes) -> Any:
         index = int(image_bytes.decode().rsplit("-", 1)[-1])
@@ -340,5 +358,5 @@ def _stub_scoring(
             return None
         return scores[index], object()
 
-    monkeypatch.setattr(filter_module, "download_image", fake_download)
+    monkeypatch.setattr(filter_module, "download_first_available", fake_download)
     monkeypatch.setattr(filter_module, "encode_best_match", fake_best_match)

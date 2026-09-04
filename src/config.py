@@ -103,6 +103,69 @@ SERPAPI_LENS_ENGINE = "google_lens"
 CATBOX_ENDPOINT = "https://catbox.moe/user/api.php"
 
 # --------------------------------------------------------------------------
+# Targeted social media search
+# --------------------------------------------------------------------------
+
+SERPAPI_WEB_ENGINE = "google"
+
+# Ceiling on site:-scoped expansion queries per run. Only platforms the Lens
+# harvest missed are queried, so this is rarely reached; with the Lens call it
+# caps a run at 5 of the 250 free monthly SerpApi searches (~50 runs a month).
+MAX_EXPANSION_SEARCHES = 4
+
+# Results requested per platform query. Enough to find the subject's own posts
+# without paying to download a long tail of incidental mentions.
+SITE_SEARCH_RESULTS = 10
+
+# Rank a verified match on a social platform above an equal-scoring one that is
+# not. The brief asks for a social media post specifically, and an exact-file
+# copy on an encyclopaedia otherwise wins on raw similarity every time.
+PREFER_SOCIAL_MATCH = True
+
+YOUTUBE_SEARCH_ENDPOINT = "https://www.googleapis.com/youtube/v3/search"
+
+# One search.list call costs 100 of the 10,000 free daily quota units, so a run
+# spends 1% of the day's allowance regardless of how many results are asked for.
+YOUTUBE_MAX_RESULTS = 10
+
+# --------------------------------------------------------------------------
+# Optional LLM (free tiers only)
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LLMProvider:
+    """A free-tier, OpenAI-compatible chat provider."""
+
+    name: str
+    env_var: str
+    base_url: str
+    default_model: str
+
+
+# Tried in this order. Both have a permanent free tier that needs no payment
+# card. The Anthropic API is deliberately absent: it is pay-as-you-go with no
+# free tier, which would break this project's zero-cost constraint.
+LLM_PROVIDERS: tuple[LLMProvider, ...] = (
+    LLMProvider(
+        name="groq",
+        env_var="GROQ_API_KEY",
+        base_url="https://api.groq.com/openai/v1",
+        default_model="llama-3.3-70b-versatile",
+    ),
+    LLMProvider(
+        name="gemini",
+        env_var="GEMINI_API_KEY",
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        default_model="gemini-2.5-flash",
+    ),
+)
+
+# The model returns a person's name, so the ceiling only has to fit one line.
+LLM_MAX_TOKENS = 64
+LLM_TIMEOUT_SECONDS = 20.0
+
+# --------------------------------------------------------------------------
 # Chain stage
 # --------------------------------------------------------------------------
 
@@ -130,6 +193,9 @@ class Settings:
     private_key: str | None
     registry_address: str | None
     github_raw_base: str | None
+    youtube_api_key: str | None
+    llm_keys: dict[str, str]
+    llm_model: str | None
 
 
 def load_settings() -> Settings:
@@ -140,6 +206,13 @@ def load_settings() -> Settings:
         private_key=_optional("PRIVATE_KEY"),
         registry_address=_optional("REGISTRY_ADDRESS"),
         github_raw_base=_optional("GITHUB_RAW_BASE"),
+        youtube_api_key=_optional("YOUTUBE_API_KEY"),
+        llm_keys={
+            provider.env_var: key
+            for provider in LLM_PROVIDERS
+            if (key := _optional(provider.env_var))
+        },
+        llm_model=_optional("LLM_MODEL"),
     )
 
 

@@ -44,22 +44,32 @@ from src.errors import (
     DownloadError,
     EvidenceError,
     NoMatchFound,
+    NoSocialMatchFound,
     NotAnchored,
     PipelineError,
+    SearchError,
     SearchNotConfigured,
 )
 from src.face import encode_primary_face
 from src.report.html import write_report
 from src.search import (
     CANDIDATE_IMAGE_DIRNAME,
+    Candidate,
+    Identity,
+    Platform,
     ReplayProvider,
     ScoredCandidate,
     SearchProvider,
     SerpApiLensProvider,
+    TARGET_PLATFORMS,
+    derive_identity,
     download_image,
+    missing_platforms,
     public_url_for,
     record_response,
     score_candidates,
+    search_platform,
+    search_videos,
 )
 
 app = typer.Typer(
@@ -86,8 +96,15 @@ def run(
     out: Annotated[
         Path | None, typer.Option("--out", help="Where to write the evidence folder.")
     ] = None,
+    allow_non_social: Annotated[
+        bool,
+        typer.Option(
+            "--allow-non-social",
+            help="Anchor the best match even if it is not a social media post.",
+        ),
+    ] = False,
 ) -> None:
-    """Search the web for a face and anchor what is found."""
+    """Search social media for a face and anchor the post that is found."""
     settings = load_settings()
     cutoff = threshold if threshold is not None else FACE_MATCH_THRESHOLD
     run_dir = evidence.create_run_dir(out)
@@ -119,19 +136,27 @@ def run(
     ui.ok("Executing reverse image / visual search...")
     response = provider.search(query_url)
     record_response(run_dir, response)
-    ui.ok(
-        f"{len(response.candidates)} candidate(s) returned; "
-        f"re-running face recognition on each"
-    )
+    ui.ok(f"{len(response.candidates)} lead(s) from the visual search")
+
+    candidates = list(response.candidates)
+    identity = derive_identity(response.identity, candidates)
+    if identity is not None:
+        ui.ok(f"Subject identified as \"{identity.name}\" (via {identity.origin})")
+    else:
+        ui.ok("Subject not identified; skipping targeted platform search")
+
+    candidates += _expand_platforms(settings, identity, candidates, replay is not None)
+    ui.ok(f"{len(candidates)} lead(s) total; re-running face recognition on each")
 
     scored = score_candidates(
         encoding.embedding,
-        response.candidates,
+        candidates,
         run_dir / CANDIDATE_IMAGE_DIRNAME,
         threshold=cutoff,
     )
     evidence.write_candidates(run_dir, scored)
     _print_candidates(scored)
+    _print_platform_coverage(scored)
 
     matches = [item for item in scored if item.is_match]
     if not matches:
@@ -140,21 +165,34 @@ def run(
             candidates=len(scored),
             threshold=cutoff,
         )
-    best = matches[0]
+
+    social = [item for item in matches if item.is_social_match]
+    if not social and not allow_non_social:
+        raise NoSocialMatchFound(
+            "Faces were matched, but none on a social media platform. "
+            "Re-run with --allow-non-social to anchor a non-social page anyway.",
+            matches=len(matches),
+            candidates=len(scored),
+        )
+
+    best = (social or matches)[0]
     similarity = best.similarity if best.similarity is not None else 0.0
 
     print()
-    ui.ok("Match found!")
+    ui.ok("Social media post found!" if best.is_social_match else "Match found!")
+    ui.detail("Platform", best.platform.label)
     ui.detail("Source", best.candidate.source or "unknown")
     ui.detail("Post URL", best.candidate.page_url)
     ui.detail("Title", best.candidate.title or "(none)")
-    ui.detail("Media URL", best.candidate.image_url)
+    ui.detail("Media URL", best.image_url_used or best.candidate.image_url)
+    ui.detail("Found via", best.candidate.origin.value)
     # Cosine similarity, shown as a percentage for readability. It measures the
     # angle between two embeddings; it is not a calibrated probability.
     ui.detail("Similarity", f"{similarity:.4f} cosine ({similarity * 100:.1f}%)")
     ui.detail(
         "Cleared threshold",
-        f"{len(matches)} of {len(scored)} candidates at cut-off {cutoff}",
+        f"{len(matches)} of {len(scored)} candidates at cut-off {cutoff} "
+        f"({len(social)} on social platforms)",
     )
 
     # -- 3. chain --------------------------------------------------------
@@ -400,6 +438,86 @@ def _chain_label(client: RegistryClient) -> str:
     return describe_chain(client.chain_id)
 
 
+def _expand_platforms(
+    settings: Settings,
+    identity: Identity | None,
+    harvested: list[Candidate],
+    is_replay: bool,
+) -> list[Candidate]:
+    """Search the target platforms the visual harvest did not reach.
+
+    Only the missing platforms are queried: re-searching one already covered
+    spends a search from a small monthly budget to rediscover a post we hold.
+
+    Every failure here is reported and swallowed. Expansion adds coverage on top
+    of a harvest that already stands on its own, so an exhausted quota or a
+    provider outage must not fail a run that has candidates in hand.
+    """
+    if identity is None:
+        return []
+    if is_replay:
+        # A replay reproduces one recorded search. Issuing live queries beside
+        # it would make the run neither a faithful replay nor a live search.
+        ui.ok("Replay: skipping live platform expansion")
+        return []
+
+    found: list[Candidate] = []
+    next_position = len(harvested) + 1
+
+    youtube_covered = any(item.platform is Platform.YOUTUBE for item in harvested)
+    if settings.youtube_api_key and not youtube_covered:
+        try:
+            videos = search_videos(
+                settings.youtube_api_key, identity.name, start_position=next_position
+            )
+            found.extend(videos)
+            next_position += len(videos)
+            ui.ok(f"YouTube Data API: {len(videos)} lead(s)")
+        except SearchError as exc:
+            ui.ok(f"YouTube Data API unavailable: {exc.message}")
+
+    if not settings.serpapi_key:
+        return found
+
+    for platform in missing_platforms(harvested + found):
+        try:
+            results = search_platform(
+                settings.serpapi_key,
+                platform,
+                identity.name,
+                start_position=next_position,
+            )
+        except SearchError as exc:
+            ui.ok(f"site:{platform.value} search failed: {exc.message}")
+            continue
+
+        found.extend(results)
+        next_position += len(results)
+        ui.ok(f"site:{platform.value} search: {len(results)} lead(s)")
+
+    return found
+
+
+def _print_platform_coverage(scored: list[ScoredCandidate]) -> None:
+    """Summarise what was found per target platform.
+
+    Printed whether or not a platform yielded anything: "searched and found
+    nothing" is a different, and more honest, statement than silence.
+    """
+    print()
+    ui.plain("platform          leads  verified")
+    ui.plain("-" * 34)
+    for platform in TARGET_PLATFORMS:
+        on_platform = [item for item in scored if item.platform is platform]
+        verified = sum(1 for item in on_platform if item.is_match)
+        ui.plain(f"{platform.label:<18}{len(on_platform):<7}{verified}")
+
+    other = [item for item in scored if item.platform is Platform.REDDIT]
+    if other:
+        verified = sum(1 for item in other if item.is_match)
+        ui.plain(f"{Platform.REDDIT.label:<18}{len(other):<7}{verified}")
+
+
 def _print_candidates(scored: list[ScoredCandidate]) -> None:
     """Print every candidate with its score.
 
@@ -407,12 +525,16 @@ def _print_candidates(scored: list[ScoredCandidate]) -> None:
     nothing rejected in it would be indistinguishable from a hardcoded answer.
     """
     print()
-    ui.plain(f"{'score':<8}{'result':<18}source")
-    ui.plain(f"{'-' * 8}{'-' * 18}{'-' * 20}")
+    ui.plain(f"{'score':<8}{'result':<18}{'platform':<14}source")
+    ui.plain(f"{'-' * 8}{'-' * 18}{'-' * 14}{'-' * 20}")
     for item in scored:
         score = f"{item.similarity:.4f}" if item.similarity is not None else "-"
         detail = f"  ({item.detail})" if item.detail else ""
-        ui.plain(f"{score:<8}{item.status:<18}{item.candidate.describe()}{detail}")
+        platform = item.platform.label if item.candidate.is_social else ""
+        ui.plain(
+            f"{score:<8}{item.status:<18}{platform:<14}"
+            f"{item.candidate.describe()}{detail}"
+        )
 
 
 def main() -> None:

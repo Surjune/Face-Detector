@@ -27,18 +27,27 @@ _HEADERS = {
 }
 
 
-def download_image(url: str) -> bytes:
+def download_image(url: str, *, referer: str | None = None) -> bytes:
     """Fetch one candidate image.
+
+    Args:
+        url: the image to fetch.
+        referer: sent as the `Referer` header. Several media CDNs return an
+            error or a placeholder for requests that arrive without one.
 
     Raises:
         DownloadError: the request failed, timed out, returned a non-image, or
             exceeded the size ceiling.
     """
+    headers = dict(_HEADERS)
+    if referer:
+        headers["Referer"] = referer
+
     try:
         response = requests.get(
             url,
             timeout=DOWNLOAD_TIMEOUT_SECONDS,
-            headers=_HEADERS,
+            headers=headers,
             stream=True,
         )
     except requests.RequestException as exc:
@@ -70,3 +79,42 @@ def download_image(url: str) -> bytes:
     if not chunks:
         raise DownloadError("Empty response", url=url)
     return b"".join(chunks)
+
+
+def download_first_available(
+    urls: tuple[str, ...] | list[str], *, referer: str | None = None
+) -> tuple[bytes, str]:
+    """Try each URL in order and return the first that yields a real image.
+
+    This is what makes social media candidates usable. Facebook and Instagram
+    publish their canonical image through `lookaside.fbsbx.com` and
+    `lookaside.instagram.com`, which answer with HTML for anything that is not
+    a recognised crawler; the search engine's own thumbnail of the very same
+    post downloads without complaint. Trying only the first URL discards those
+    posts even though a working image was supplied alongside it.
+
+    Returns:
+        The image bytes and the URL that produced them.
+
+    Raises:
+        DownloadError: every URL failed. The message names each failure so the
+            evidence records why, rather than a bare "unreachable".
+    """
+    if not urls:
+        raise DownloadError("No image URL for this candidate")
+
+    failures: list[str] = []
+    for url in urls:
+        try:
+            return download_image(url, referer=referer), url
+        except DownloadError as exc:
+            failures.append(f"{_host(url)}: {exc.message}")
+
+    raise DownloadError("; ".join(failures), url=urls[0], attempts=len(urls))
+
+
+def _host(url: str) -> str:
+    """Short host label, so a multi-URL failure message stays readable."""
+    from src.search.platforms import hostname_of
+
+    return hostname_of(url) or url[:40]

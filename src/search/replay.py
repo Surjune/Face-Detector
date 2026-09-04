@@ -17,7 +17,7 @@ from typing import Any
 
 from src.errors import SearchNotConfigured, SearchProviderError
 from src.search.provider import SearchResponse
-from src.search.serpapi_lens import parse_visual_matches
+from src.search.serpapi_lens import extract_identity, parse_lens_response
 
 RAW_RESPONSE_FILENAME = "search_response.json"
 
@@ -46,8 +46,9 @@ class ReplayProvider:
             provider=self.name,
             query_image_url=str(self._record["query_image_url"]),
             retrieved_at=str(self._record["retrieved_at"]),
-            candidates=parse_visual_matches(payload),
+            candidates=parse_lens_response(payload),
             raw=payload,
+            identity=extract_identity(payload),
         )
 
 
