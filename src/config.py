@@ -146,24 +146,35 @@ class LLMProvider:
 # Tried in this order. Both have a permanent free tier that needs no payment
 # card. The Anthropic API is deliberately absent: it is pay-as-you-go with no
 # free tier, which would break this project's zero-cost constraint.
+#
+# Gemini is tried first because its default is a rolling alias rather than a
+# pinned version. Pinned model names expire: an earlier revision of this file
+# named two models that had both been withdrawn by the time the keys were
+# tested, and each returned a 404 that looked like an authentication failure.
+# An alias keeps a clone working months later. `LLM_MODEL` pins a version when
+# reproducibility matters more than longevity.
 LLM_PROVIDERS: tuple[LLMProvider, ...] = (
-    LLMProvider(
-        name="groq",
-        env_var="GROQ_API_KEY",
-        base_url="https://api.groq.com/openai/v1",
-        default_model="llama-3.3-70b-versatile",
-    ),
     LLMProvider(
         name="gemini",
         env_var="GEMINI_API_KEY",
         base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-        default_model="gemini-2.5-flash",
+        default_model="gemini-flash-lite-latest",
+    ),
+    LLMProvider(
+        name="groq",
+        env_var="GROQ_API_KEY",
+        base_url="https://api.groq.com/openai/v1",
+        default_model="openai/gpt-oss-20b",
     ),
 )
 
-# The model returns a person's name, so the ceiling only has to fit one line.
-LLM_MAX_TOKENS = 64
-LLM_TIMEOUT_SECONDS = 20.0
+# Generous for a one-line answer, because the ceiling is not really sizing the
+# answer. Groq's gpt-oss models reason before replying and that reasoning is
+# billed against the same budget: at 64 tokens they hit the limit mid-thought
+# and return an empty message with finish_reason "length". 512 leaves room to
+# think and still answer.
+LLM_MAX_TOKENS = 512
+LLM_TIMEOUT_SECONDS = 30.0
 
 # --------------------------------------------------------------------------
 # Chain stage

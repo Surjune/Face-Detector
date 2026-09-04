@@ -111,6 +111,13 @@ def complete(prompt: str, *, system: str | None = None) -> str:
     except (ValueError, KeyError, IndexError, TypeError) as exc:
         raise LLMError(f"{config.provider} returned an unexpected response: {exc}") from exc
 
-    if not isinstance(content, str):
-        raise LLMError(f"{config.provider} returned no text content")
+    if not isinstance(content, str) or not content.strip():
+        # A reasoning model that exhausts its budget before answering returns
+        # HTTP 200 with an empty message. Treat that as a failure rather than
+        # letting an empty string travel on as if it were an answer.
+        raise LLMError(
+            f"{config.provider} returned no text content "
+            f"(model {config.model}, finish_reason "
+            f"{payload.get('choices', [{}])[0].get('finish_reason')})"
+        )
     return content.strip()

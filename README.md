@@ -181,6 +181,9 @@ payment card — the pipeline runs identically without them.
 | [`YOUTUBE_API_KEY`](https://console.cloud.google.com) | 10,000 units/day (~100 searches), no billing account | Searches YouTube natively instead of relying on what the visual search happened to index |
 | [`GEMINI_API_KEY`](https://aistudio.google.com/apikey) or [`GROQ_API_KEY`](https://console.groq.com) | Gemini ~1,500 req/day; Groq 30 req/min | Reads the subject's name from result titles when the visual search has not already supplied it |
 
+The default models are rolling aliases rather than pinned versions, so a clone
+still works months from now; set `LLM_MODEL` to pin one.
+
 Gemini uses the same Google account as the YouTube key, so that is one signup for
 both. Only one short LLM call is made per run, and only when the free
 deterministic path fails.
@@ -277,7 +280,7 @@ Google CEO Sundar Pichai" frequently shows a different person at the same event.
 .venv/Scripts/python -m pytest
 ```
 
-173 tests. No test makes a network call. Two kinds are worth singling out:
+182 tests. No test makes a network call. Two kinds are worth singling out:
 
 - The **contract tests are not mocked**. The Solidity is genuinely compiled and
   executed on an in-process EVM, covering anchoring, lookup, rejection of a
