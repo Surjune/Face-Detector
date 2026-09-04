@@ -83,6 +83,43 @@ a measured similarity threshold are kept. That is what lets the pipeline match a
 Every rejected candidate is kept too, with its score. That record is the evidence
 the search actually ran — a hardcoded result would have nothing to show.
 
+### How far it reaches, measured
+
+Reach depends almost entirely on who the subject is. `scripts/compare_engines.py`
+measures that for a given photograph, and these are real numbers from it:
+
+| Subject | Engine | Leads | Face-verified | Social posts | Best score | Identity resolved |
+| --- | --- | --- | --- | --- | --- | --- |
+| Public figure | Google Lens | 30 | 30 | 3 | 1.0000 | yes |
+| | Yandex | 30 | 30 | 2 | 1.0000 | no |
+| Ordinary person | Google Lens | 30 | **2** | 1 | 0.5217 | no |
+| | Yandex | 30 | **11** | 1 | 0.6354 | no |
+
+The ordinary subject is someone who published a CC-licensed portrait of
+themselves and has no encyclopaedia entry.
+
+Three things that table shows:
+
+- **Yandex matters far more than Google for ordinary people** — 11 verified
+  matches against 2. Western engines restrict public face matching for private
+  individuals; Yandex does not. For a public figure the two are equivalent, so
+  the gap only appears in the case that is actually hard.
+- **Identity resolution is a public-figure feature.** It comes from Google's
+  Knowledge Graph, which has no entry for a private individual, so the targeted
+  `site:` expansion cannot run for them. The visual engines carry that case alone.
+- **Scores near the threshold deserve suspicion.** A public figure matched an
+  exact copy at 1.0000; the ordinary subject's best was 0.6354, close enough to
+  the 0.50 cut-off that a lookalike is a real possibility. Treat a match as a
+  lead to check, not proof of identity.
+
+Run it on your own photograph:
+
+```bash
+python scripts/compare_engines.py --image path/to/your/photo.jpg
+```
+
+It costs two searches and no gas, and anchors nothing.
+
 ### No API searches social media by face
 
 Worth stating plainly, because it shapes the whole design. Meta's Graph API reads
@@ -299,7 +336,7 @@ Google CEO Sundar Pichai" frequently shows a different person at the same event.
 .venv/Scripts/python -m pytest
 ```
 
-191 tests. No test makes a network call. Two kinds are worth singling out:
+209 tests. No test makes a network call. Two kinds are worth singling out:
 
 - The **contract tests are not mocked**. The Solidity is genuinely compiled and
   executed on an in-process EVM, covering anchoring, lookup, rejection of a
@@ -329,6 +366,10 @@ default; run them with `-m model`.
 - **A search engine's index is not the platform.** A post that exists but has
   never been crawled is invisible to this pipeline, so "not found" never means
   "does not exist".
+- **Ordinary people are much harder than public figures**, and the measured
+  table above is the honest picture. Identity resolution does not work for them
+  at all, so the targeted per-platform search cannot run, and the visual engines
+  return fewer and weaker matches. A private account is invisible entirely.
 - **False positives are possible.** The threshold is derived from five genuine
   pairs — enough to show clean separation, not enough to characterise the tail.
   Treat a match as a strong lead, not proof of identity.
