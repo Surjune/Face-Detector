@@ -78,6 +78,7 @@ def _render(
   .tag {{ display: inline-block; padding: .1rem .45rem; border-radius: .25rem;
           font-size: .78rem; border: 1px solid #8886; }}
   .tag.match {{ border-color: #2e7d32; color: #2e7d32; font-weight: 600; }}
+  .tag.social {{ border-color: #1565c0; color: #1565c0; font-weight: 600; }}
   .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
            gap: .75rem; }}
   .grid figure {{ margin: 0; }}
@@ -124,8 +125,12 @@ def _probe_section(input_image: Path | None, receipt: Any) -> str:
 
 
 def _match_section(receipt: Any, matched: list[dict[str, Any]]) -> str:
+    from src.search.platforms import classify
+
+    platform = classify(receipt.match.post_url)
     return f"""<h2>Match</h2>
 <dl>
+  <dt>platform</dt><dd><span class="tag social">{html.escape(platform.label)}</span></dd>
   <dt>post</dt><dd><a href="{html.escape(receipt.match.post_url)}">
       {html.escape(receipt.match.post_url)}</a></dd>
   <dt>title</dt><dd>{html.escape(receipt.match.page_title) or "&mdash;"}</dd>
@@ -147,6 +152,7 @@ def _candidates_section(candidates: list[dict[str, Any]]) -> str:
   <td class="num">{_score(item)}</td>
   <td><span class="tag {'match' if item.get('status') == 'match' else ''}">
       {html.escape(STATUS_LABELS.get(str(item.get("status")), "?"))}</span></td>
+  <td>{_platform_cell(item)}</td>
   <td>{html.escape(str(item.get("source") or ""))}</td>
   <td><a href="{html.escape(str(item.get("page_url") or ""))}">
       {html.escape(_truncate(str(item.get("title") or item.get("page_url") or "")))}</a></td>
@@ -169,7 +175,7 @@ def _candidates_section(candidates: list[dict[str, Any]]) -> str:
 <p class="sub">Each one was embedded and scored against the probe face. The rejects are
 kept deliberately: they are the evidence that a real search ran.</p>
 <div class="wrap"><table>
-<thead><tr><th>score</th><th>result</th><th>source</th><th>page</th></tr></thead>
+<thead><tr><th>score</th><th>result</th><th>platform</th><th>source</th><th>page</th></tr></thead>
 <tbody>
 {rows}
 </tbody>
@@ -200,6 +206,17 @@ def _anchor_section(anchor: Any) -> str:
   <dt>gas used</dt><dd>{anchor.gas_used}</dd>
   {explorer}
 </dl>"""
+
+
+def _platform_cell(item: dict[str, Any]) -> str:
+    """Badge the platform, highlighted when it is a social one."""
+    from src.search.platforms import Platform, classify
+
+    platform = classify(str(item.get("page_url") or ""))
+    if platform is Platform.OTHER:
+        return ""
+    social = " social" if item.get("status") == "match" else ""
+    return f'<span class="tag{social}">{html.escape(platform.label)}</span>'
 
 
 def _score(item: dict[str, Any]) -> str:
