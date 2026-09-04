@@ -71,6 +71,11 @@ def load_image(source: Path | bytes) -> Image.Image:
         else:
             image = Image.open(source)
         image.load()
+        # A palette image carrying transparency has to go through RGBA first.
+        # Converting it straight to RGB drops the alpha channel in a way Pillow
+        # warns about, and candidate images pulled off the web include them.
+        if image.mode == "P" and "transparency" in image.info:
+            image = image.convert("RGBA")
         return image.convert("RGB")
     except FileNotFoundError as exc:
         raise ImageLoadError("Image file not found", path=str(source)) from exc
