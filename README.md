@@ -1,38 +1,55 @@
 # Face Detector
 
-Takes a photograph of a face, searches the web for the same person, and anchors
-what it finds on a public blockchain so the discovery can be re-checked later
-and shown to be untampered.
+Takes a photograph of a face, searches social media for the same person, and
+anchors the post it finds on a public blockchain so the discovery can be
+re-checked later and shown to be untampered.
 
 ```
 input image
   → detect the face and reduce it to a 512-d embedding
-  → reverse-image search the web
-  → re-run face recognition on every result, keep the ones that match
-  → hash the matched post and anchor the hash on Ethereum Sepolia
+  → harvest every result set from a reverse image search
+  → identify the subject, then query the platforms the harvest missed
+  → re-run face recognition on every candidate, keep the ones that match
+  → hash the matched social post and anchor it on Ethereum Sepolia
   → verify: recompute the hash, look it up on chain
 ```
 
+Seven platforms are covered deliberately: **Facebook, X, Threads, LinkedIn,
+YouTube, Instagram and TikTok** (Reddit counts too when it turns up).
+
 ## See it working
 
-`evidence/run_2026-09-03T16-10-03Z/` is a real run committed to this repository:
-Google Lens returned 30 candidates for the probe photograph, 25 cleared the
-similarity threshold across Wikipedia, Reuters, Forbes, IMDb and others, and the
-best match was anchored on Sepolia at digest
-[`0xb9bbc6b1…9d62`](https://sepolia.etherscan.io/tx/0xd6d07f2024b7d8d7b809608101015b7db380b0d6d943b75cc342f39a3aa4699c).
-Open `report.html` inside it for the full candidate table, or reproduce the
-check yourself with nothing but a clean clone:
+`evidence/run_2026-09-04T09-23-05Z/` is a real run committed to this repository.
+The search returned 30 leads, the subject was identified from Google's own
+resolved entity, and the platforms the harvest missed were queried directly.
+Nine candidates were face-verified on social platforms:
+
+| Platform | Leads | Face-verified |
+| --- | --- | --- |
+| Instagram | 6 | 6 |
+| YouTube | 3 | 2 |
+| Facebook | 1 | 1 |
+
+The anchored match is a **Facebook video post** at 0.9772 cosine similarity,
+recorded on Sepolia in
+[tx `0x1b1f3780…`](https://sepolia.etherscan.io/tx/0x1b1f3780482f765c08d685a7c4865991ab1d76c70fab83d94ab587eca9a34d0f).
+Open `report.html` inside the folder for the full candidate table, or reproduce
+the check yourself with nothing but a clean clone:
 
 ```bash
-python -m src.pipeline verify --run "evidence/run_2026-09-03T16-10-03Z"
+python -m src.pipeline verify --run "evidence/run_2026-09-04T09-23-05Z"
 ```
 
 ```bash
-python -m src.pipeline tamper-demo --run "evidence/run_2026-09-03T16-10-03Z"
+python -m src.pipeline tamper-demo --run "evidence/run_2026-09-04T09-23-05Z"
 ```
 
-Neither command needs a key, a wallet, or any setup beyond installing the
-dependencies above — `verify` reads the public Sepolia RPC directly.
+An earlier run is kept at `evidence/run_2026-09-03T16-10-03Z/`. It verifies too,
+and its recorded search response is real Lens output that the test-suite parses
+directly.
+
+Neither command needs a key, a wallet, or any gas — `verify` reads a public
+Sepolia RPC endpoint directly.
 
 ## Why the middle step matters
 
@@ -40,13 +57,46 @@ A reverse image search on its own only finds copies of the *same file*. It is an
 image lookup, not a face search, and it would fail the moment the person appears
 in a different photograph.
 
-So the search result is treated as a list of leads, not as an answer. Every
-candidate image is downloaded, embedded, and scored against the probe face; only
-the ones that clear a measured similarity threshold are kept. That is what lets
-the pipeline match a *different photograph of the same person*.
+So search results are treated as leads, not answers. Every candidate image is
+downloaded, embedded, and scored against the probe face; only the ones that clear
+a measured similarity threshold are kept. That is what lets the pipeline match a
+*different photograph of the same person*.
 
 Every rejected candidate is kept too, with its score. That record is the evidence
 the search actually ran — a hardcoded result would have nothing to show.
+
+### No API searches social media by face
+
+Worth stating plainly, because it shapes the whole design. Meta's Graph API reads
+only Pages you own, behind app review and business verification. X removed its
+free tier in February 2026. LinkedIn and TikTok are approval-gated. Nothing
+legitimate accepts a face and returns Instagram posts.
+
+What this pipeline does instead is find social posts through indexes that *are*
+reachable — a visual search, and `site:`-scoped queries per platform — and then
+**verify each one independently against the probe face**. That is the brief's
+"API, or a scripted search approach". A claim to search inside Instagram by face
+would be a lie, and the rejected candidates are here precisely so the search can
+be audited rather than taken on trust.
+
+### Finding a social post rather than settling for one
+
+Two things make the difference between finding a social post and finding a
+Wikipedia page:
+
+- **Every result set is harvested.** A Lens response carries candidates in three
+  separate arrays; the social posts concentrate in the two that are easy to
+  overlook. They are interleaved rather than read in order, because the first
+  array alone fills the candidate budget.
+- **Each candidate carries several image URLs.** Facebook and Instagram serve
+  their canonical image through crawler endpoints that answer with HTML for
+  anything else, while a working thumbnail of the same post sits beside it.
+  Trying only the first URL silently discards those posts.
+
+Selection then prefers a verified social match over a higher-scoring page. If
+nothing social clears the threshold the run **fails** with `no_social_match_found`
+rather than quietly anchoring something that does not meet the requirement;
+`--allow-non-social` overrides that deliberately.
 
 ## What goes on chain
 
@@ -122,6 +172,22 @@ Copy `.env.example` to `.env`. Every value is optional depending on the command.
 | `verify`, `tamper-demo`, `run --replay` | nothing |
 | `run --chain local` | a free [SerpApi](https://serpapi.com) key |
 | `run` on Sepolia | that key, plus a funded throwaway Sepolia key |
+
+Two further keys deepen the search. Both are optional, and both are free with no
+payment card — the pipeline runs identically without them.
+
+| Key | Free tier | What it adds |
+| --- | --- | --- |
+| [`YOUTUBE_API_KEY`](https://console.cloud.google.com) | 10,000 units/day (~100 searches), no billing account | Searches YouTube natively instead of relying on what the visual search happened to index |
+| [`GEMINI_API_KEY`](https://aistudio.google.com/apikey) or [`GROQ_API_KEY`](https://console.groq.com) | Gemini ~1,500 req/day; Groq 30 req/min | Reads the subject's name from result titles when the visual search has not already supplied it |
+
+Gemini uses the same Google account as the YouTube key, so that is one signup for
+both. Only one short LLM call is made per run, and only when the free
+deterministic path fails.
+
+**No paid API is used anywhere in this project.** The Anthropic API was considered
+for the identity step and rejected for exactly this reason: it is pay-as-you-go
+with no free tier.
 
 Use a key that has never held real funds. It signs one transaction on a test
 network and nothing else.
@@ -211,9 +277,15 @@ Google CEO Sundar Pichai" frequently shows a different person at the same event.
 .venv/Scripts/python -m pytest
 ```
 
-91 tests. No test makes a network call. The contract tests are not mocked: the
-Solidity is genuinely compiled and executed on an in-process EVM, covering
-anchoring, lookup, rejection of a re-anchor, and tamper detection.
+173 tests. No test makes a network call. Two kinds are worth singling out:
+
+- The **contract tests are not mocked**. The Solidity is genuinely compiled and
+  executed on an in-process EVM, covering anchoring, lookup, rejection of a
+  re-anchor, and tamper detection.
+- The **harvest tests parse the real recorded Lens response** committed with the
+  earlier demo run, not a hand-written fixture. They assert that the X post, the
+  Instagram reels and the Facebook videos are recovered from it — the direct
+  evidence that those results were in the response all along.
 
 Cases needing the pretrained weights are marked `model` and deselected by
 default; run them with `-m model`.
@@ -223,9 +295,18 @@ default; run them with `-m model`.
 - **It finds only what is already indexed.** If Google Lens has not seen a
   photograph of the subject, the pipeline correctly returns nothing. This is why
   the demo uses a public figure.
-- **250 searches a month** on the SerpApi free tier. There is no reverse image
-  search API that is simultaneously free, unlimited and within its provider's
-  terms of service.
+- **250 searches a month** on the SerpApi free tier. A run spends one search on
+  the visual harvest plus up to four on the platforms it missed, so roughly 50
+  full runs a month. There is no reverse image search API that is simultaneously
+  free, unlimited and within its provider's terms of service.
+- **Platform reachability differs, and it is not uniform.** Facebook, Instagram,
+  X, YouTube, LinkedIn and Reddit posts are reachable through the visual index
+  and `site:` queries. Threads and TikTok are indexed far more thinly and often
+  return nothing — that is a real absence, and the coverage table reports it
+  rather than hiding it.
+- **A search engine's index is not the platform.** A post that exists but has
+  never been crawled is invisible to this pipeline, so "not found" never means
+  "does not exist".
 - **False positives are possible.** The threshold is derived from five genuine
   pairs — enough to show clean separation, not enough to characterise the tail.
   Treat a match as a strong lead, not proof of identity.
