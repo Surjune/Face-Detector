@@ -108,9 +108,26 @@ class TestRun:
     ) -> None:
         result = do_run(probe_image, recorded_search, tmp_path / "out")
         assert result.exit_code == 0, result.output
-        assert "[1/3] FACE" in result.output
-        assert "[2/3] SEARCH" in result.output
-        assert "[3/3] CHAIN" in result.output
+        assert "[1/3] FACE DETECTION & ENCODING" in result.output
+        assert "[2/3] WEB / SOCIAL MEDIA SEARCH" in result.output
+        assert "[3/3] BLOCKCHAIN ATTESTATION & RECORDING" in result.output
+
+    def test_runs_the_verification_routine_after_anchoring(
+        self, probe_image: Path, recorded_search: Path, tmp_path: Path
+    ) -> None:
+        """The round trip is proven at the point the receipt is created."""
+        result = do_run(probe_image, recorded_search, tmp_path / "out")
+        assert "[VERIFICATION ROUTINE]" in result.output
+        assert "On-chain digest matches computed payload digest" in result.output
+        assert "Tamper-evidence verified: MATCH" in result.output
+
+    def test_prints_every_candidate_score_including_rejects(
+        self, probe_image: Path, recorded_search: Path, tmp_path: Path
+    ) -> None:
+        """A result set with no rejects shown could not be told from a fake one."""
+        result = do_run(probe_image, recorded_search, tmp_path / "out")
+        assert "below_threshold" in result.output
+        assert result.output.count("match") >= 2
 
     def test_writes_a_complete_evidence_folder(
         self, probe_image: Path, recorded_search: Path, tmp_path: Path
