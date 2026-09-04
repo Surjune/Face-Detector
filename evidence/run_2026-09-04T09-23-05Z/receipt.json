@@ -1,0 +1,19 @@
+{
+  "embedding_sha256": "fcdbd6c0169bfc5312282d23f9da28e3349c9186fe5691cab935a459feabb3b4",
+  "input_image_sha256": "8e2e4fc7f6a119a16b45d7cb177975f95cf3c2d7e52be642ccc14f783f65bb4f",
+  "match": {
+    "image_sha256": "a9e451db15d8a7abf47ecb00a5440fdf560e26e6f8054b54ab334539630f9fd8",
+    "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQzNe_8fCnjsgpBdBp3MRfjHbdoqYD3qzhOnCci-GWnQPF_0jUvd1K9jng&s=10",
+    "page_title": "What Sundar Pichai Reads: Shaping Google's AI Future ... by StartupHub.ai on Facebook. Play on Facebook. 1:04",
+    "post_url": "https://www.facebook.com/Startuphubai/videos/what-sundar-pichai-reads-shaping-googles-ai-futurecurious-about-the-mind-behind-/1122776074034916/",
+    "similarity": "0.9772"
+  },
+  "pipeline_version": "1.0.0",
+  "schema": "face-chain-verify/v1",
+  "search": {
+    "candidate_count": 30,
+    "provider": "serpapi_google_lens",
+    "query_image_sha256": "8e2e4fc7f6a119a16b45d7cb177975f95cf3c2d7e52be642ccc14f783f65bb4f",
+    "retrieved_at": "2026-09-04T09:23:17Z"
+  }
+}
