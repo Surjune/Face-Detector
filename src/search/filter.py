@@ -12,12 +12,13 @@ record is the evidence the search actually ran.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Union
 
 from src.chain.canonical import sha256_hex
-from src.config import FACE_MATCH_THRESHOLD
+from src.config import DOWNLOAD_WORKERS, FACE_MATCH_THRESHOLD
 from src.errors import DownloadError, PipelineError
 from src.face import Embedding, encode_best_match
 from src.search.fetch import download_first_available
@@ -25,6 +26,11 @@ from src.search.platforms import Platform
 from src.search.provider import Candidate
 
 Status = Literal["match", "below_threshold", "no_face", "unreachable"]
+
+# What one download attempt produced: the image bytes and the URL that served
+# them, or the error explaining why every URL failed. The failure is carried
+# rather than raised so one dead link cannot abort a batch.
+Fetched = Union[tuple[bytes, str], DownloadError]
 
 CANDIDATE_IMAGE_DIRNAME = "candidates"
 
@@ -64,15 +70,22 @@ def score_candidates(
 ) -> list[ScoredCandidate]:
     """Download, embed and score every candidate.
 
+    Downloading runs concurrently and scoring runs sequentially after it. About
+    70% of the per-candidate cost is waiting on the network, so fetching one at
+    a time left the run idle for most of its duration. Face embedding is CPU
+    work on a shared model and stays serial.
+
     Ordered social matches first, then by score. The brief asks for a social
     media post specifically, and an exact-file copy on an encyclopaedia will
     otherwise outrank every genuine social post on raw similarity.
-
-    Images are written to disk as they arrive rather than held in memory: the
-    candidate list is bounded, but the images behind it are not.
     """
     images_dir.mkdir(parents=True, exist_ok=True)
-    scored = [_score_one(reference, item, images_dir, threshold) for item in candidates]
+    fetched = _download_all(candidates)
+
+    scored = [
+        _score_one(reference, candidate, fetched[index], images_dir, threshold)
+        for index, candidate in enumerate(candidates)
+    ]
 
     return sorted(
         scored,
@@ -85,9 +98,39 @@ def score_candidates(
     )
 
 
+def _download_all(candidates: list[Candidate]) -> list[Fetched]:
+    """Fetch every candidate image concurrently, preserving input order.
+
+    Results are placed back at their original index rather than collected as
+    they complete, so the candidate list — and therefore the numbered image
+    files and the receipt built from them — does not depend on which download
+    happened to finish first.
+    """
+    results: list[Fetched] = [None] * len(candidates)  # type: ignore[list-item]
+
+    with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as pool:
+        futures = {
+            pool.submit(
+                download_first_available,
+                candidate.image_urls,
+                referer=candidate.page_url,
+            ): index
+            for index, candidate in enumerate(candidates)
+        }
+        for future in as_completed(futures):
+            index = futures[future]
+            try:
+                results[index] = future.result()
+            except DownloadError as exc:
+                results[index] = exc
+
+    return results
+
+
 def _score_one(
     reference: Embedding,
     candidate: Candidate,
+    fetched: Fetched,
     images_dir: Path,
     threshold: float,
 ) -> ScoredCandidate:
@@ -96,13 +139,12 @@ def _score_one(
     One unreachable or faceless candidate must never abort the run — a search
     result set routinely contains dead links and pictures of scenery.
     """
-    try:
-        image_bytes, used_url = download_first_available(
-            candidate.image_urls, referer=candidate.page_url
+    if isinstance(fetched, DownloadError):
+        return ScoredCandidate(
+            candidate=candidate, status="unreachable", detail=fetched.message
         )
-    except DownloadError as exc:
-        return ScoredCandidate(candidate=candidate, status="unreachable", detail=exc.message)
 
+    image_bytes, used_url = fetched
     digest = sha256_hex(image_bytes)
     path = images_dir / f"{candidate.position:02d}_{digest[:12]}{_suffix_for(used_url)}"
     path.write_bytes(image_bytes)

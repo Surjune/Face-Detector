@@ -249,8 +249,13 @@ Stated plainly, because a tool like this is easy to overclaim.
 - **Ordinary people are much harder than public figures** — see the table above.
   Identity resolution comes from Google's Knowledge Graph, which has no entry for
   a private individual, so the targeted per-platform search cannot run for them.
-- **A match is a strong lead, not proof of identity.** The threshold is derived
-  from a small sample, and scores near the cut-off could be a lookalike.
+- **A match is a strong lead, not proof of identity.** Different people have
+  been measured as high as 0.6602, and genuine pairs start at 0.6405 — the two
+  overlap. Anything between 0.70 and 0.80 is flagged as marginal and should be
+  eyeballed before it is believed.
+- **The visual search returns scene-similar photographs by design.** Two people
+  beside a motorcycle in a field will be offered as candidates; the face check
+  is the only thing separating "similar picture" from "same person".
 - **250 searches a month** on the free SerpApi tier — about 50 full runs.
 - **The probe image is published.** Reverse image search takes a URL, not an
   upload, so an image not already in this repository is uploaded to a public host.
@@ -273,10 +278,33 @@ Stated plainly, because a tool like this is easy to overclaim.
   assert that the X post, Instagram reels and Facebook videos are all recovered
   from it.
 
-The threshold is measured, not guessed. Over labelled photographs of three
-people: genuine pairs scored 0.6405–0.9370, impostor pairs at most 0.3040. The
-cut-off sits at 0.50, inside that empty band and biased towards precision — a
-false match anchored on a public blockchain cannot be withdrawn.
+The threshold is measured, and it has been measured twice.
+
+The first attempt used 16 impostor pairs from 3 people and concluded different
+faces top out at 0.30, so the cut-off was set to 0.50. A real run then matched
+**two clearly different men** — both photographed outdoors beside a motorcycle —
+at **0.6548**, and anchored the wrong person. Sixteen pairs say nothing about
+the tail of a distribution.
+
+Re-measured over **990 impostor pairs from 45 distinct people**
+(`scripts/measure_impostors.py`):
+
+| | Score |
+| --- | --- |
+| mean | +0.1161 |
+| 95th percentile | +0.4168 |
+| 99th percentile | +0.5275 |
+| **maximum** | **+0.6602** |
+
+1.11% of different-person pairs scored above the old 0.50 cut-off. Genuine pairs
+run 0.6405–0.9370, so the distributions genuinely **overlap** — no threshold
+separates them perfectly.
+
+The cut-off is now **0.70**, above the measured impostor maximum. That loses the
+hardest genuine pairs, which is the right trade: a false match is anchored on a
+public blockchain and cannot be withdrawn, while a missed match merely ends the
+run with an explicit failure. Matches between 0.70 and 0.80 are reported as
+**marginal** and flagged for human review rather than presented as certain.
 
 ## Ethics
 

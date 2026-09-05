@@ -19,7 +19,7 @@ from typer.testing import CliRunner
 import src.pipeline as pipeline
 import src.search.filter as filter_module
 from src.chain.canonical import receipt_digest
-from src.config import EMBEDDING_DIM
+from src.config import EMBEDDING_DIM, FACE_MATCH_THRESHOLD
 from src.errors import DownloadError
 from src.face import FaceEncoding
 from src.search.provider import SearchResponse
@@ -29,7 +29,14 @@ from tests.test_search import lens_payload, non_social_payload
 
 runner = CliRunner()
 
-CANDIDATE_SCORES = {0: 0.88, 1: 0.31, 2: 0.62}
+# Expressed relative to the configured cut-off rather than as fixed numbers,
+# so re-tuning the threshold cannot silently turn these fixtures into a
+# different scenario than the one each test means to exercise.
+CANDIDATE_SCORES = {
+    0: round(FACE_MATCH_THRESHOLD + 0.18, 4),   # comfortably a match
+    1: round(FACE_MATCH_THRESHOLD - 0.39, 4),   # comfortably a reject
+    2: round(FACE_MATCH_THRESHOLD + 0.05, 4),   # a match, but a weaker one
+}
 
 
 @pytest.fixture

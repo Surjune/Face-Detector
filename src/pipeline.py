@@ -34,6 +34,7 @@ from src.chain import (
 from src.config import (
     DEFAULT_PROBE_IMAGE,
     EMBEDDING_DIM,
+    FACE_MARGINAL_CEILING,
     FACE_MATCH_THRESHOLD,
     MAX_TOTAL_CANDIDATES,
     SEPOLIA_CHAIN_ID,
@@ -209,6 +210,18 @@ def run(
         f"{len(matches)} of {len(scored)} candidates at cut-off {cutoff} "
         f"({len(social)} on social platforms)",
     )
+    if similarity < FACE_MARGINAL_CEILING:
+        # Above the cut-off but inside the band where the impostor distribution
+        # still has weight. Saying so is the honest report; silently anchoring
+        # it as a confident match is how the wrong person gets recorded.
+        print()
+        ui.ok("MARGINAL MATCH - check this one yourself before trusting it")
+        ui.detail(
+            "Why",
+            f"{similarity:.4f} is above the {cutoff} cut-off but below "
+            f"{FACE_MARGINAL_CEILING}, and different people have been measured "
+            f"as high as 0.6602",
+        )
 
     # -- 3. chain --------------------------------------------------------
     ui.section("[3/3] BLOCKCHAIN ATTESTATION & RECORDING")

@@ -60,23 +60,34 @@ EMBEDDING_DECIMALS = 6
 
 # Cosine similarity at or above which two faces are treated as the same person.
 #
-# Measured, not assumed. Over a labelled set of freely licensed Commons
-# photographs of three people (scripts/fetch_calibration_set.py, then
-# scripts/calibrate_threshold.py):
+# This was 0.50, derived from sixteen impostor pairs across three people which
+# put the highest different-person score at 0.30. That sample was far too small
+# to describe the tail, and a real run proved it: two clearly different men,
+# both photographed outdoors beside a motorcycle, scored 0.6548 and the wrong
+# person was anchored. The visual search returns scene-similar photographs by
+# design, so the face check is the only thing standing between "looks like a
+# similar picture" and "is the same person".
 #
-#     genuine pairs    n=5   min +0.6405  mean +0.7843  max +0.9370
-#     impostor pairs   n=16  min -0.1949  mean +0.0286  max +0.3040
+# Re-measured over 990 impostor pairs from 45 distinct individuals
+# (scripts/measure_impostors.py):
 #
-# The two distributions do not overlap; the empty band runs from 0.3040 to
-# 0.6405, whose midpoint is 0.4722. This value sits just above that midpoint
-# because the asymmetry matters: a false match gets anchored on a public
-# blockchain and cannot be withdrawn, while a missed match merely ends the run.
-# That leaves 0.20 of margin above the worst impostor and 0.14 below the worst
-# genuine pair.
+#     mean +0.1161   median +0.1099   p95 +0.4168   p99 +0.5275   max +0.6602
 #
-# The sample is small, so treat this as calibrated rather than settled, and
-# re-derive it on a larger set before relying on the exact value.
-FACE_MATCH_THRESHOLD = 0.50
+# 1.11% of those different-person pairs scored at or above the old 0.50.
+#
+# Genuine pairs, measured separately, ran min +0.6405 mean +0.7843 max +0.9370,
+# so the two distributions genuinely overlap and no threshold separates them
+# perfectly. The choice is therefore about which error to prefer, and the two
+# are not symmetric: a false match is anchored on a public blockchain and cannot
+# be withdrawn, while a missed match merely ends the run with an explicit
+# failure. So the cut-off sits above the measured impostor maximum, accepting
+# that the hardest genuine pairs are lost with it.
+FACE_MATCH_THRESHOLD = 0.70
+
+# Matches between the threshold and this value are real matches by the measured
+# distribution, but close enough to the impostor tail (max +0.6602) to deserve a
+# human glance before being trusted. Reported, never silently downgraded.
+FACE_MARGINAL_CEILING = 0.80
 
 # Similarity values are rounded to this many decimals before hashing. Raw float
 # repr differs across platforms and would break cross-machine verification.
@@ -98,6 +109,16 @@ MAX_TOTAL_CANDIDATES = 60
 
 # Per-request network budget for fetching a candidate image.
 DOWNLOAD_TIMEOUT_SECONDS = 15.0
+
+# Candidate images are fetched concurrently. Measured on a real run, a download
+# takes about 1.3s against 0.6s to embed the face, so roughly 70% of the work
+# per candidate is spent waiting on the network. Fetching serially left the run
+# idle for most of its duration.
+#
+# Eight is chosen to shorten that wait without hammering any one host: candidates
+# come from many different domains, so in practice only one or two requests hit
+# the same server at a time.
+DOWNLOAD_WORKERS = 8
 
 # Refuse candidate images larger than this. Guards against a decompression bomb
 # or a mislabelled video standing in for a JPEG.
