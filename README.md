@@ -34,8 +34,8 @@ A real run is committed to this repository at
 | --- | --- |
 | **Anchored post** | [A Facebook video post](https://www.facebook.com/Startuphubai/videos/what-sundar-pichai-reads-shaping-googles-ai-futurecurious-about-the-mind-behind-/1122776074034916/) |
 | **Face similarity** | 0.9772 cosine (97.7%) |
-| **Candidates checked** | 30 — of which 29 face-verified, **9 on social platforms** |
-| **Platforms hit** | Instagram ×6, YouTube ×2, Facebook ×1 |
+| **Candidates checked** | 30 — of which 27 face-verified, **7 on social platforms** |
+| **Platforms hit** | Instagram ×4, YouTube ×2, Facebook ×1 |
 | **Blockchain record** | [Sepolia tx `0x1b1f3780…`](https://sepolia.etherscan.io/tx/0x1b1f3780482f765c08d685a7c4865991ab1d76c70fab83d94ab587eca9a34d0f) · block 11,632,578 |
 | **Contract** | [`0x56394614…B9C4`](https://sepolia.etherscan.io/address/0x56394614d21b38C0557810e1Bb1D934b4620B9C4) |
 
@@ -45,7 +45,8 @@ What the run actually printed:
 [2/3] WEB / SOCIAL MEDIA SEARCH
 --------------------------------------------------
 ✓ 30 lead(s) from the visual search
-✓ Subject identified as "Sundar Pichai" (via lens_related_content)
+✓ Platform search term: "Sundar Pichai" (guessed from result titles)
+  - Note: a query only - identity is decided after face verification
 ✓ site:threads search: 0 lead(s)
 
   score   result            platform      source
@@ -59,8 +60,14 @@ What the run actually printed:
   platform          leads  verified
   ----------------------------------
   Facebook          1      1
-  Instagram         6      6
+  Instagram         6      4
   YouTube           3      2
+
+  identity
+  ----------------------------------
+  name           Sundar Pichai
+  basis          named on 19 of 27 face-verified result(s)
+  derived from   lens_related_content
 
 ✓ Social media post found!
   - Platform: Facebook
@@ -249,6 +256,11 @@ Stated plainly, because a tool like this is easy to overclaim.
 - **Ordinary people are much harder than public figures** — see the table above.
   Identity resolution comes from Google's Knowledge Graph, which has no entry for
   a private individual, so the targeted per-platform search cannot run for them.
+- **A name is never announced before the face check.** The search term used for
+  the per-platform queries is scraped from the titles of pages that merely looked
+  similar, so it frequently names a stranger. It is printed as a query, and the
+  run reports an identity only afterwards, counted from results whose face
+  actually matched. When nothing matches, the verdict is `NOT IDENTIFIED`.
 - **A match is a strong lead, not proof of identity.** Different people have
   been measured as high as 0.6602, and genuine pairs start at 0.6405 — the two
   overlap. Anything between 0.70 and 0.80 is flagged as marginal and should be

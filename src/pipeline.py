@@ -59,6 +59,7 @@ from src.search import (
     CANDIDATE_IMAGE_DIRNAME,
     Candidate,
     Identity,
+    IdentityVerdict,
     Platform,
     ReplayProvider,
     ScoredCandidate,
@@ -66,6 +67,7 @@ from src.search import (
     SerpApiLensProvider,
     TARGET_PLATFORMS,
     YandexReverseImageProvider,
+    confirm_identity,
     derive_identity,
     download_image,
     missing_platforms,
@@ -154,9 +156,14 @@ def run(
 
     identity = derive_identity(response.identity, candidates)
     if identity is not None:
-        ui.ok(f"Subject identified as \"{identity.name}\" (via {identity.origin})")
+        # A query string, not a conclusion. Nothing has been face-checked at
+        # this point, so this name is only what the titles of visually similar
+        # pages happen to say. What the run actually concludes about identity is
+        # printed after the face check, from the results that survive it.
+        ui.ok(f"Platform search term: \"{identity.name}\" (guessed from result titles)")
+        ui.detail("Note", "a query only - identity is decided after face verification")
     else:
-        ui.ok("Subject not identified; skipping targeted platform search")
+        ui.ok("No search term could be derived; skipping targeted platform search")
 
     candidates += _expand_platforms(settings, identity, candidates, replay is not None)
     if len(candidates) > MAX_TOTAL_CANDIDATES:
@@ -175,6 +182,8 @@ def run(
     _print_platform_coverage(scored)
 
     matches = [item for item in scored if item.is_match]
+    _print_identity(confirm_identity(identity, [item.candidate for item in matches]))
+
     if not matches:
         raise NoMatchFound(
             "No candidate cleared the similarity threshold",
@@ -579,6 +588,49 @@ def _print_platform_coverage(scored: list[ScoredCandidate]) -> None:
     if other:
         verified = sum(1 for item in other if item.is_match)
         ui.plain(f"{Platform.REDDIT.label:<18}{len(other):<7}{verified}")
+
+
+def _print_identity(verdict: IdentityVerdict) -> None:
+    """State who the subject is, only once the face check has had its say.
+
+    Before verification the pipeline holds nothing but a name scraped from pages
+    a search engine thought looked similar. Printing that as an identification
+    is a claim the evidence does not support: a run whose every candidate is
+    later rejected would still have announced a name, and the name would belong
+    to whichever stranger the search happened to surface.
+    """
+    print()
+    ui.plain("identity")
+    ui.plain("-" * 34)
+
+    if verdict.is_confirmed:
+        ui.plain(f"{'name':<15}{verdict.name}")
+        ui.plain(
+            f"{'basis':<15}named on {verdict.supporting} of {verdict.verified} "
+            f"face-verified result(s)"
+        )
+        ui.plain(f"{'derived from':<15}{verdict.origin}")
+        return
+
+    ui.plain(f"{'name':<15}NOT IDENTIFIED - not sure who this is")
+
+    if verdict.verified:
+        ui.plain(
+            f"{'basis':<15}{verdict.verified} result(s) matched the face, but none "
+            f"of them names a person"
+        )
+    else:
+        ui.plain(f"{'basis':<15}no result matched the face, so nothing names the subject")
+
+    if verdict.search_term:
+        ui.plain(f"{'search term':<15}\"{verdict.search_term}\" - unconfirmed")
+        if verdict.verified:
+            ui.plain(f"{'':<15}A guess from page titles. The results that did match")
+            ui.plain(f"{'':<15}the face do not carry this name, so nothing supports it.")
+        else:
+            ui.plain(f"{'':<15}A guess taken from the titles of pages that merely")
+            ui.plain(f"{'':<15}looked similar. Every one was rejected by the face")
+            ui.plain(f"{'':<15}check, so it is not the subject's name.")
 
 
 def _print_candidates(scored: list[ScoredCandidate]) -> None:

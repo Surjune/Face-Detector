@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 import src.search.identity as identity_module
-from src.search.identity import derive_identity
+from src.search.identity import confirm_identity, derive_identity
 from src.search.provider import Candidate, Identity
 
 
@@ -129,3 +129,66 @@ class TestLLMFallback:
 
         monkeypatch.setattr(identity_module.llm, "complete", fail)
         assert derive_identity(None, [candidate("an ambiguous headline")]) is None
+
+
+class TestConfirmIdentity:
+    """What the run may claim about identity, judged only on verified results.
+
+    This is the guard on the defect where a name read off visually similar pages
+    was announced as the subject's identity, in a run whose every candidate was
+    then rejected by the face check.
+    """
+
+    def test_nothing_verified_means_nothing_identified(self) -> None:
+        guess = Identity(name="Rasindu Jayan", origin="title_frequency")
+        verdict = confirm_identity(guess, [])
+
+        assert verdict.is_confirmed is False
+        assert verdict.name is None
+        assert verdict.verified == 0
+        # Kept, so the run can say what was searched for and why it means nothing.
+        assert verdict.search_term == "Rasindu Jayan"
+
+    def test_a_guess_named_beside_a_matched_face_is_confirmed(self) -> None:
+        guess = Identity(name="Sundar Pichai", origin="lens_related_content")
+        verdict = confirm_identity(guess, [candidate("Sundar Pichai on X")])
+
+        assert verdict.is_confirmed is True
+        assert verdict.name == "Sundar Pichai"
+        assert verdict.supporting == 1
+        assert verdict.origin == "lens_related_content"
+
+    def test_matched_titles_outrank_a_guess_they_contradict(self) -> None:
+        """The face check is the authority, so its results name the subject."""
+        guess = Identity(name="Someone Else", origin="title_frequency")
+        verified = [
+            candidate("Ada Lovelace - profile", 0),
+            candidate("Photos of Ada Lovelace", 1),
+        ]
+        verdict = confirm_identity(guess, verified)
+
+        assert verdict.name == "Ada Lovelace"
+        assert verdict.origin == "verified_titles"
+        assert verdict.search_term == "Someone Else"
+
+    def test_matches_without_names_identify_nobody(self) -> None:
+        """A matched face on an untitled page proves a match, not a name."""
+        verdict = confirm_identity(None, [candidate("", 0), candidate("", 1)])
+
+        assert verdict.is_confirmed is False
+        assert verdict.name is None
+        assert verdict.verified == 2
+
+    def test_one_verified_title_is_enough(self) -> None:
+        """Unverified titles need two appearances; a verified one needs one."""
+        verdict = confirm_identity(None, [candidate("Ada Lovelace at work")])
+
+        assert verdict.name == "Ada Lovelace"
+        assert verdict.supporting == 1
+
+    def test_the_name_is_matched_case_insensitively(self) -> None:
+        guess = Identity(name="Ada Lovelace", origin="llm")
+        verdict = confirm_identity(guess, [candidate("ADA LOVELACE / gallery")])
+
+        assert verdict.is_confirmed is True
+        assert verdict.supporting == 1

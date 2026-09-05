@@ -17,14 +17,25 @@ Three routes, cheapest and most reliable first:
 The name is a *search term*, never an assertion of identity. Nothing is
 anchored on it, and every candidate it turns up is still face-verified before
 it can become a match.
+
+`confirm_identity` is the other half of that promise. It runs *after* the face
+check and reports what can honestly be said about who the subject is, weighing
+only the results whose face actually matched. A search term that survives into
+a verified result is evidence; one whose every candidate was rejected is not,
+and has to be reported as such rather than left standing as an answer.
 """
 
 from __future__ import annotations
 
 import re
 from collections import Counter
+from dataclasses import dataclass
 
 from src import llm
+from src.config import (
+    IDENTITY_MIN_TITLE_APPEARANCES,
+    IDENTITY_MIN_VERIFIED_APPEARANCES,
+)
 from src.errors import PipelineError
 from src.search.provider import Candidate, Identity
 
@@ -74,7 +85,7 @@ def derive_identity(
     if not titles:
         return None
 
-    frequent = _most_frequent_name(titles)
+    frequent = _most_frequent_name(titles, minimum=IDENTITY_MIN_TITLE_APPEARANCES)
     if frequent is not None:
         return Identity(name=frequent, origin="title_frequency", confidence="medium")
 
@@ -86,11 +97,13 @@ def derive_identity(
     return None
 
 
-def _most_frequent_name(titles: list[str]) -> str | None:
-    """The capitalised phrase appearing in the most distinct titles.
+def _most_frequent_name(titles: list[str], *, minimum: int) -> str | None:
+    """The capitalised phrase appearing in at least `minimum` distinct titles.
 
     Counted once per title rather than per occurrence, so a single title
-    repeating a publication's name cannot outvote the subject.
+    repeating a publication's name cannot outvote the subject. `minimum` is the
+    caller's confidence in its own titles: high for raw search results, low for
+    results a face check has already accepted.
     """
     counts: Counter[str] = Counter()
     for title in titles:
@@ -105,8 +118,7 @@ def _most_frequent_name(titles: list[str]) -> str | None:
         return None
 
     name, appearances = counts.most_common(1)[0]
-    # A name appearing in only one title is as likely to be a passing mention.
-    return name if appearances >= 2 else None
+    return name if appearances >= minimum else None
 
 
 def _ask_llm(titles: list[str]) -> str | None:
@@ -127,3 +139,83 @@ def _ask_llm(titles: list[str]) -> str | None:
     if len(answer.split()) > _MAX_NAME_WORDS:
         return None
     return answer
+
+
+@dataclass(frozen=True)
+class IdentityVerdict:
+    """What can be said about the subject's identity once faces have been checked.
+
+    Kept separate from `Identity` on purpose. An `Identity` is an input to the
+    search — a string to put after `site:instagram.com`. A verdict is an output
+    of the whole run, and it is allowed to say "no".
+    """
+
+    name: str | None
+    origin: str
+    supporting: int
+    verified: int
+    search_term: str | None
+
+    @property
+    def is_confirmed(self) -> bool:
+        """Whether a face-verified result actually names this person."""
+        return self.name is not None and self.supporting > 0
+
+
+def confirm_identity(
+    guess: Identity | None,
+    verified: list[Candidate],
+) -> IdentityVerdict:
+    """Decide what the run may claim about identity, using verified results only.
+
+    The pre-verification guess is deliberately not trusted here. It is read off
+    the titles of whatever a reverse image search returned, which includes every
+    photograph that merely *looked* similar; if the face check then rejected all
+    of them, the name behind them describes someone else entirely.
+
+    So the guess is confirmed only where it also appears beside a face that
+    matched. Failing that, a name is re-derived from the verified titles alone,
+    which is the stronger evidence in any case. Failing both, the verdict says
+    the subject was not identified.
+
+    Args:
+        guess: the search term used during expansion, if one was derived.
+        verified: candidates whose face cleared the threshold.
+    """
+    term = guess.name if guess is not None else None
+    titles = [item.title for item in verified if item.title]
+
+    if guess is not None:
+        supporting = _titles_naming(titles, guess.name)
+        if supporting >= IDENTITY_MIN_VERIFIED_APPEARANCES:
+            return IdentityVerdict(
+                name=guess.name,
+                origin=guess.origin,
+                supporting=supporting,
+                verified=len(verified),
+                search_term=term,
+            )
+
+    derived = _most_frequent_name(titles, minimum=IDENTITY_MIN_VERIFIED_APPEARANCES)
+    if derived is not None:
+        return IdentityVerdict(
+            name=derived,
+            origin="verified_titles",
+            supporting=_titles_naming(titles, derived),
+            verified=len(verified),
+            search_term=term,
+        )
+
+    return IdentityVerdict(
+        name=None,
+        origin="",
+        supporting=0,
+        verified=len(verified),
+        search_term=term,
+    )
+
+
+def _titles_naming(titles: list[str], name: str) -> int:
+    """How many titles mention a name, compared case-insensitively."""
+    needle = name.casefold()
+    return sum(1 for title in titles if needle in title.casefold())

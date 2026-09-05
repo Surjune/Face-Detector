@@ -154,6 +154,17 @@ MAX_EXPANSION_SEARCHES = 4
 # without paying to download a long tail of incidental mentions.
 SITE_SEARCH_RESULTS = 10
 
+# How many *unverified* result titles must carry a name before it is used as a
+# platform search term. One appearance is as likely to be a passing mention as
+# the subject, and a wrong name spends the search budget on the wrong person.
+IDENTITY_MIN_TITLE_APPEARANCES = 2
+
+# The same bar for titles of results the face check has already accepted. It is
+# lower because the evidence is stronger: the face on that page has been matched
+# to the probe, so the name beside it is about the right person. A name on one
+# verified page outweighs a name on a dozen unverified ones.
+IDENTITY_MIN_VERIFIED_APPEARANCES = 1
+
 # Rank a verified match on a social platform above an equal-scoring one that is
 # not. The brief asks for a social media post specifically, and an exact-file
 # copy on an encyclopaedia otherwise wins on raw similarity every time.

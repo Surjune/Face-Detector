@@ -10,7 +10,7 @@ from src.search.filter import (
     Status,
     score_candidates,
 )
-from src.search.identity import derive_identity
+from src.search.identity import IdentityVerdict, confirm_identity, derive_identity
 from src.search.imghost import public_url_for, upload_to_catbox
 from src.search.platforms import (
     SOCIAL_PLATFORMS,
@@ -44,6 +44,7 @@ __all__ = [
     "CANDIDATE_IMAGE_DIRNAME",
     "Candidate",
     "Identity",
+    "IdentityVerdict",
     "Platform",
     "RAW_RESPONSE_FILENAME",
     "ReplayProvider",
@@ -57,6 +58,7 @@ __all__ = [
     "Status",
     "TARGET_PLATFORMS",
     "classify",
+    "confirm_identity",
     "derive_identity",
     "download_first_available",
     "download_image",
