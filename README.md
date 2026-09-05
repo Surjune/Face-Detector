@@ -27,12 +27,11 @@ YouTube · Instagram · TikTok**
 
 ## Proof it works
 
-Two real runs are committed to this repository. Nothing here is mocked or
+Three real runs are committed to this repository. Nothing here is mocked or
 hand-picked.
 
-The first is what the shipped `inputs/probe.jpg` produces. Run the default
-command on a clean clone and you get exactly this -
-`evidence/run_2026-09-05T17-34-09Z/`.
+Look at `evidence/run_2026-09-05T17-34-09Z/` first: it is what the shipped
+`inputs/probe.jpg` produced, from `run` with no arguments.
 
 | | |
 | --- | --- |
@@ -97,6 +96,19 @@ at 0.9772, with 27 of 30 candidates face-verified and 7 social matches across
 Facebook, Instagram and YouTube -
 [Sepolia tx `0x1b1f3780…`](https://sepolia.etherscan.io/tx/0x1b1f3780482f765c08d685a7c4865991ab1d76c70fab83d94ab587eca9a34d0f).
 Same code, same command, a different face and a different platform.
+
+**The third run is the one that exposed the gap.**
+`evidence/run_2026-09-03T16-10-03Z/` predates the social media work and anchors a
+Wikipedia article — which is not a social media post, and that is precisely what
+drove the per-platform search that followed. It stays in the repository because
+the harvest tests parse its recorded Google Lens response as their input, so the
+parsing is tested against a real payload rather than a fixture someone wrote to
+pass.
+
+**A re-run will not reproduce these numbers, and should not.** The pipeline
+searches the live web, so the candidate set moves as the web does. What is fixed
+is the committed evidence: the receipt, every candidate with its score, and the
+digest anchored on chain — all three still verifiable years from now.
 
 ## Check it yourself in two commands
 
