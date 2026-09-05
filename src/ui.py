@@ -5,17 +5,51 @@ mark, and printing one there raises or prints a replacement character. The
 marker is therefore chosen once from what the output stream actually supports
 rather than assumed, so the same code reads correctly on a UTF-8 terminal and
 on a cp1252 one.
+
+The same code page is a hazard for text the pipeline does not control. Page
+titles come from whatever a social platform serves, and emoji in them are
+routine -- an anchored YouTube title here ends in a heart. On a cp1252 console
+printing one raises UnicodeEncodeError, which killed `tamper-demo` outright
+after the receipt had already been read. Stdout is therefore switched to escape
+what it cannot encode, so an unrepresentable character costs a few odd-looking
+bytes instead of the command.
 """
 
 from __future__ import annotations
 
 import sys
+from typing import TextIO
 
 # Wide enough to underline the longest section heading.
 RULE_WIDTH = 50
 
 # Section bodies are indented to sit under their heading.
 INDENT = "  "
+
+
+def _survive_unencodable_output(stream: TextIO | None = None) -> None:
+    """Make an output stream escape characters its console cannot represent.
+
+    The encoding itself is left alone: forcing UTF-8 onto a console that is not
+    reading it produces mojibake, which is a worse failure than an escape
+    sequence because it looks like corrupted data rather than a limitation of
+    the terminal.
+
+    Silently skipped where the stream is not a real text file -- pytest's
+    capture object among others -- since there is nothing to reconfigure and no
+    console to protect.
+    """
+    stream = stream if stream is not None else sys.stdout
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is None:
+        return
+    try:
+        reconfigure(errors="backslashreplace")
+    except (ValueError, OSError):  # pragma: no cover - stream already detached
+        pass
+
+
+_survive_unencodable_output()
 
 
 def _encodable(character: str) -> bool:

@@ -27,61 +27,76 @@ YouTube · Instagram · TikTok**
 
 ## Proof it works
 
-A real run is committed to this repository at
-`evidence/run_2026-09-04T09-23-05Z/`. Nothing here is mocked or hand-picked.
+Two real runs are committed to this repository. Nothing here is mocked or
+hand-picked.
+
+The first is what the shipped `inputs/probe.jpg` produces. Run the default
+command on a clean clone and you get exactly this -
+`evidence/run_2026-09-05T17-34-09Z/`.
 
 | | |
 | --- | --- |
-| **Anchored post** | [A Facebook video post](https://www.facebook.com/Startuphubai/videos/what-sundar-pichai-reads-shaping-googles-ai-futurecurious-about-the-mind-behind-/1122776074034916/) |
-| **Face similarity** | 0.9772 cosine (97.7%) |
-| **Candidates checked** | 30 — of which 27 face-verified, **7 on social platforms** |
-| **Platforms hit** | Instagram ×4, YouTube ×2, Facebook ×1 |
-| **Blockchain record** | [Sepolia tx `0x1b1f3780…`](https://sepolia.etherscan.io/tx/0x1b1f3780482f765c08d685a7c4865991ab1d76c70fab83d94ab587eca9a34d0f) · block 11,632,578 |
+| **Anchored post** | [A YouTube Shorts post](https://www.youtube.com/shorts/CSpe96dvqYk) |
+| **Face similarity** | 0.9616 cosine (96.2%) |
+| **Candidates checked** | 42 - of which 21 face-verified, **11 on social platforms** |
+| **Platforms hit** | Instagram x8, YouTube x2, X x1 |
+| **Blockchain record** | [Sepolia tx `0x874af845…`](https://sepolia.etherscan.io/tx/0x874af8455159eb1b33642857074e5c48748af0d9d894235a2bbc3e2d3022edd4) - block 11,641,819 |
 | **Contract** | [`0x56394614…B9C4`](https://sepolia.etherscan.io/address/0x56394614d21b38C0557810e1Bb1D934b4620B9C4) |
 
-What the run actually printed:
+What it found, reproduced from that folder's committed `candidates.json`:
 
 ```
 [2/3] WEB / SOCIAL MEDIA SEARCH
 --------------------------------------------------
-✓ 30 lead(s) from the visual search
-✓ Platform search term: "Sundar Pichai" (guessed from result titles)
++ 30 lead(s) from the visual search
++ Platform search term: "Suresh Raina" (guessed from result titles)
   - Note: a query only - identity is decided after face verification
-✓ site:threads search: 0 lead(s)
++ 42 lead(s) total; re-running face recognition on each
 
   score   result            platform      source
   ------------------------------------------------------------
-  0.9772  match             Facebook      Facebook
-  0.8391  match             Instagram     Instagram
-  0.8176  match             YouTube       YouTube
-  0.4979  below_threshold   Facebook      Facebook      ← rejected
-  -       no_face                         Wikimedia     ← rejected
+  0.9798  match                           Mashable India
+  0.9616  match             YouTube       YouTube
+  0.9550  match             X / Twitter   x.com
+  0.6807  below_threshold   X / Twitter   X - rainaedits    <- rejected
+  0.5792  below_threshold   TikTok        TikTok            <- rejected
+  -       no_face           Threads       Threads           <- rejected
 
   platform          leads  verified
   ----------------------------------
-  Facebook          1      1
-  Instagram         6      4
-  YouTube           3      2
+  Facebook          3      0
+  X / Twitter       2      1
+  Threads           6      0
+  LinkedIn          0      0
+  YouTube           2      2
+  Instagram         11     8
+  TikTok            6      0
 
   identity
   ----------------------------------
-  name           Sundar Pichai
-  basis          named on 19 of 27 face-verified result(s)
-  derived from   lens_related_content
+  name           Suresh Raina
+  basis          named on 11 of 21 face-verified result(s)
+  derived from   title_frequency
 
-✓ Social media post found!
-  - Platform: Facebook
-  - Similarity: 0.9772 cosine (97.7%)
-
-[3/3] BLOCKCHAIN ATTESTATION & RECORDING
---------------------------------------------------
-✓ Payload SHA-256 digest: 0x1aa8d69d97a5ba3e851c549cc6b3a5a71d8a92791f56f72288ee4e877733c7a0
-✓ Transaction mined in block #11,632,578
++ Social media post found!
+  - Platform: YouTube
+  - Similarity: 0.9616 cosine (96.2%)
 ```
 
 **The rejected candidates are shown on purpose.** A hardcoded answer would have
-nothing to reject. Every candidate, kept or discarded, is recorded with its score
-in `candidates.json`.
+nothing to reject. Every candidate, kept or discarded, is recorded with its
+score in `candidates.json`.
+
+Look at the row rejected at **0.6807** - a real X post, a different person,
+scoring just under the cut-off. Rows like that are the entire reason the
+threshold sits where it does; see [how it is tested](#how-it-is-tested).
+
+**The second run is a different subject**, `evidence/run_2026-09-04T09-23-05Z/`.
+It anchors [a Facebook video post](https://www.facebook.com/Startuphubai/videos/what-sundar-pichai-reads-shaping-googles-ai-futurecurious-about-the-mind-behind-/1122776074034916/)
+at 0.9772, with 27 of 30 candidates face-verified and 7 social matches across
+Facebook, Instagram and YouTube -
+[Sepolia tx `0x1b1f3780…`](https://sepolia.etherscan.io/tx/0x1b1f3780482f765c08d685a7c4865991ab1d76c70fab83d94ab587eca9a34d0f).
+Same code, same command, a different face and a different platform.
 
 ## Check it yourself in two commands
 
@@ -89,12 +104,16 @@ No API key. No wallet. No gas. Just install and run — `verify` reads a public
 Sepolia endpoint directly.
 
 ```bash
-python -m src.pipeline verify --run "evidence/run_2026-09-04T09-23-05Z"
+python -m src.pipeline verify --run "evidence/run_2026-09-05T17-34-09Z"
 ```
 
 ```
-anchored 0x1aa8d69d97a5ba3e851c549cc6b3a5a71d8a92791f56f72288ee4e877733c7a0
-computed 0x1aa8d69d97a5ba3e851c549cc6b3a5a71d8a92791f56f72288ee4e877733c7a0
+anchored 0x382e906aa7abbe48f964a8d3c00cdd8cd53122bba5fc063f2ba0e42b0a508048
+computed 0x382e906aa7abbe48f964a8d3c00cdd8cd53122bba5fc063f2ba0e42b0a508048
+
+on Ethereum Sepolia at 0x56394614d21b38C0557810e1Bb1D934b4620B9C4
+  submitter    0x62d54EfeB2D75a37C1Ca36E09cD41E9a3519B11E
+  block        11641819
 
 VERIFIED  the receipt matches the record anchored on chain.
 ```
@@ -102,18 +121,28 @@ VERIFIED  the receipt matches the record anchored on chain.
 Now prove it is tamper-evident. This edits **one character** of the receipt:
 
 ```bash
-python -m src.pipeline tamper-demo --run "evidence/run_2026-09-04T09-23-05Z"
+python -m src.pipeline tamper-demo --run "evidence/run_2026-09-05T17-34-09Z"
 ```
 
 ```
-  before  "...Play on Facebook. 1:04"   digest=0x1aa8d69d…733c7a0
-  after   "...Play on Facebook. 1:0a"   digest=0xa6034a9f…72b5fd95
+  before  page_title='Happy retirement Ms dhoni x suresh raina \u2665\ufe0f - YouTube'
+          digest=0x382e906aa7abbe48f964a8d3c00cdd8cd53122bba5fc063f2ba0e42b0a508048
+  after   page_title='Happy retirement Ms dhoni x suresh raina \u2665\ufe0f - YouTuba'
+          digest=0x813c858ca2fb7db11ca700392a589827ae26a879450eb1c8a00bf57acbd94ef5
 
   original  found
   tampered  not found
 
 TAMPERED  the edited receipt has no record on chain.
 ```
+
+One character changed at the end of the title, and the digest that results
+shares nothing with the original.
+
+That title really does end in a heart emoji, and `\u2665\ufe0f` is how it is
+printed on a Windows console whose code page cannot encode one. Escaping it
+rather than letting the write fail is deliberate: the same title crashed this
+command outright until it was fixed.
 
 ## Run it on any face
 
@@ -124,16 +153,19 @@ python -m src.pipeline run
 ```
 
 `inputs/probe.jpg` is the only input. The pipeline has no idea who it is looking
-for until the search tells it — the subject's name is derived at run time, never
-configured. Use `--image path/to/photo.jpg` for a file elsewhere.
+for until it looks: the subject's name is derived at run time, never configured,
+and it is not reported as an identity until the face check has ruled on every
+candidate. Use `--image path/to/photo.jpg` for a file elsewhere.
 
-*Verified on a second person with no other change: it identified them, searched
-the platforms the visual index had missed, and anchored a LinkedIn post
-face-verified at 0.9600 with 10 social matches across four platforms.*
+*Pointed at a private individual it finds nothing, and says so.* A run on the
+second committed probe returned 60 leads, rejected every one of them at the face
+check, exited `no_match_found`, and reported the identity as `NOT IDENTIFIED`.
+That is the correct answer, and being able to watch it refuse is what makes the
+successes above mean anything.
 
 ## Install
 
-Python 3.12, three commands:
+Python 3.12, four commands:
 
 ```bash
 python -m venv .venv
@@ -144,11 +176,15 @@ python -m venv .venv
 ```
 
 ```bash
-.venv/Scripts/pip install -r requirements.txt && .venv/Scripts/pip install --no-deps -r requirements-evm.txt
+.venv/Scripts/pip install -r requirements.txt
+```
+
+```bash
+.venv/Scripts/pip install --no-deps -r requirements-evm.txt
 ```
 
 <details>
-<summary>Why three commands and not one</summary>
+<summary>Why four commands and not one</summary>
 
 1. **CPU-only PyTorch.** A plain `pip install torch` can pull a ~2.5 GB CUDA
    build nothing here uses; the CPU wheel is ~200 MB.
@@ -235,7 +271,9 @@ numbers:
 | | Yandex | 30 | **11** | 1 | 0.6354 | — |
 
 The ordinary subject published a CC-licensed portrait of themselves and has no
-encyclopaedia entry. Run it on your own photograph:
+encyclopaedia entry. **These counts were measured at the earlier 0.50 cut-off**,
+so at today's 0.70 they would be lower on both rows; the Google-versus-Yandex
+gap is the point, and it is unaffected. Re-measure on your own photograph:
 
 ```bash
 python scripts/compare_engines.py --image path/to/your/photo.jpg
@@ -281,7 +319,7 @@ Stated plainly, because a tool like this is easy to overclaim.
 .venv/Scripts/python -m pytest
 ```
 
-**209 tests, no network calls.** Two kinds are worth singling out:
+**220 tests, no network calls.** Two kinds are worth singling out:
 
 - The **contract tests are not mocked** — the Solidity is genuinely compiled and
   executed on an in-process EVM, covering anchoring, lookup, rejection of a
@@ -322,8 +360,12 @@ run with an explicit failure. Matches between 0.70 and 0.80 are reported as
 
 This is a face search tool, and the technique can be used to identify strangers.
 Point it at yourself, a consenting subject, or a public figure whose material is
-already public. The probe image shipped here is a CC BY licensed photograph of a
-public figure; see [`inputs/README.md`](inputs/README.md).
+already public.
+
+The default probe is a photograph of a public figure, so everything a run
+discovers about him was already public. Only `inputs/probe1.jpg` carries a
+documented free licence, and the folder records the provenance of all three
+images: see [`inputs/README.md`](inputs/README.md).
 
 ## Licence
 

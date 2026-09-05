@@ -13,7 +13,8 @@ __pycache__/
 # Solidity build output (compiled artifacts are committed selectively, see artifacts/)
 artifacts/build/
 
-# Pipeline output — real runs are large; only the curated demo run is committed
+# Pipeline output - real runs are large; only the curated demo runs are committed
+# (added with `git add -f`; see the Proof section of the README)
 evidence/run_*/
 
 # OS

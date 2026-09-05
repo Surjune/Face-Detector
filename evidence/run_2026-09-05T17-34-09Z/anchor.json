@@ -1,0 +1,10 @@
+{
+  "digest": "0x382e906aa7abbe48f964a8d3c00cdd8cd53122bba5fc063f2ba0e42b0a508048",
+  "tx_hash": "0x874af8455159eb1b33642857074e5c48748af0d9d894235a2bbc3e2d3022edd4",
+  "block_number": 11641819,
+  "chain_id": 11155111,
+  "contract_address": "0x56394614d21b38C0557810e1Bb1D934b4620B9C4",
+  "gas_used": 70210,
+  "network": "sepolia",
+  "explorer_url": "https://sepolia.etherscan.io/tx/0x874af8455159eb1b33642857074e5c48748af0d9d894235a2bbc3e2d3022edd4"
+}
