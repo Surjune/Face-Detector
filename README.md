@@ -3,22 +3,7 @@
 **Give it a photograph of a face. It finds that person's social media post, then
 records the discovery on a public blockchain so nobody can alter it afterwards.**
 
-```
-   photograph                                              Ethereum Sepolia
-       │                                                          ▲
-       ▼                                                          │
- ┌───────────┐      ┌────────────────┐      ┌──────────────┐      │
- │  1. FACE  │─────▶│   2. SEARCH    │─────▶│  3. ANCHOR   │──────┘
- │           │      │                │      │              │
- │  detect   │      │ 2 image engines│      │ hash the post│
- │  encode   │      │ + per-platform │      │ write it on  │
- │  512-d    │      │   queries      │      │ chain        │
- └───────────┘      └────────┬───────┘      └──────────────┘
-                             │
-                    every result is re-checked
-                    against the probe face —
-                    only real matches survive
-```
+![How it works: photograph to face encoding to search to blockchain anchor](docs/pipeline-flow.png)
 
 Seven platforms are searched deliberately: **Facebook · X · Threads · LinkedIn ·
 YouTube · Instagram · TikTok**
